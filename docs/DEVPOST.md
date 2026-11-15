@@ -8,7 +8,7 @@ So we designed around one person: **Riley, a nurse who uses a screen reader and 
 
 ## What it does
 
-**Triage Evidence Worklist** is a clinician-facing worklist for a *simulated* urgent-care unit (all patients are made up):
+**A.I Triage System** (the app is called the *Triage Evidence Worklist*) is a clinician-facing worklist for a *simulated* urgent-care unit (all patients are made up):
 
 - **A note arrives → Claude finds the evidence.** Claude reads a short excerpt and returns the **exact quotes**: who the statement is about, whether it's reported or denied, when it happened, and what changed since the earlier note. Everything is labeled **"AI-assisted, unverified."**
 - **A nurse checks it** against the original note, one click away, and can accept, correct any field, or reject.
@@ -50,7 +50,7 @@ So we designed around one person: **Riley, a nurse who uses a screen reader and 
 - The useful AI job here isn't "decide who's sickest." It's **"show me the exact words that changed."** A simple 2001-style negation rule already handles "denies" well, so AI earns its place on **who** a statement is about, **when** it happened, and **what changed across notes**.
 - Privacy needs testing, not just intentions. The canary tests found a leak we didn't expect.
 
-## What's next for Triage Evidence Worklist
+## What's next for A.I Triage System
 
 - Measure Claude live against our keyword baselines on a larger set reviewed by clinicians.
 - Test with nurses who use VoiceOver every day.
