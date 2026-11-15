@@ -1,0 +1,15 @@
+# 10. If Claude disappears halfway through the shift
+
+**Short answer: yes.** A nurse using VoiceOver can still find every waiting patient, identify unread notes, escalate manually, and see who owns each overdue action. None of these paths read model output. Tested: provider outage in `test_provider_failure_preserves_care_and_manual_paths`, plus the keyboard and accessibility-tree checks in `tests/test_browser.py`. **VoiceOver speech itself has not been tested.**
+
+What changes when Claude is unavailable: within about 2 minutes of retries, new notes show "AI service unavailable; manual review required." The status bar's "Last AI call" shows the failure, and the inbox shows "N note(s) need manual review because AI extraction did not complete." The announcement is "AI extraction could not complete for a note. Manual review required in evidence inbox." No deadline moves.
+
+**Exact path (VoiceOver + keyboard):**
+
+1. **Every waiting patient.** VO-Cmd-H (next heading) to **"Care queue, official order (4 waiting)"**. Tab steps through each patient: "Review Patient B, button" followed by its description ("Position 1 of 4. Level 1, confirmed by Sam at 10:00. Primary: Riley, RN (demo). Bedside review due 10:10..."). Order uses only confirmed priority, deadlines, arrival, and ID, so it is identical with or without AI.
+2. **Unread notes.** In the left sidebar ("Pages" navigation), press **"Notes to review"** (its badge shows the count). Focus moves to **"Evidence inbox (N unreviewed)"**. Each note is a button: "Open note review for Patient C, received 10:12", described by its status, e.g. "AI service unavailable; manual review required." Open it, expand **"Original note, full text"** (one action), read the note, choose **"I reviewed the original note (no AI evidence)"**, and activate **"Record review decision"**. The note-review deadline completes.
+3. **Escalate a concern manually.** In the care queue, Tab to **"Escalate concern for Patient X"** (next to every patient), choose a reason, and activate **"Raise escalation for Patient X"**. The result is announced and creates a 5-minute (illustrative) response deadline owned by the charge nurse. It does not touch the AI path.
+4. **Who owns each overdue action.** In the sidebar, press **"Overdue"**. Focus moves to **"Overdue and owned actions (N overdue)"**. The table caption reads the count. Each row gives Patient, Action, Due ("09:55, overdue by 17 min"), **Owner** ("Jordan, RN (demo), on break, covered by Sam"), Accepted by, Patient reached, and **Escalated to** ("Sam, Charge RN ... at 10:00"). Use VO table navigation (VO-arrows) across columns.
+5. **Is the screen current?** The status bar shows "Live updates: Connected" or "Disconnected since 10:14. Data may be out of date," plus "EHR feed: Last message 10:12" or "May be stalled." Disconnects and reconnects are announced.
+
+**What still cannot be found this way:** a patient whose deterioration was never written down (risk R3). That patient depends on bedside reassessment, which the reassessment deadlines in the queue keep visible.

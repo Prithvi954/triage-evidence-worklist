@@ -1,0 +1,20 @@
+{
+  "_comment": "Synthetic gold labels authored by the team for the seeded fixtures. Labels are per (note, term, sentence). This is a tiny illustrative set: it can show WHERE approaches differ, not how well any approach performs clinically.",
+  "cases": [
+    {"case": "denied then reported (current note)", "note": ["note_B2", 1], "prior": ["note_B1", 1],
+     "expected": [{"term": "demo signal A", "sentence_contains": "now reports", "subject": "patient", "assertion": "reported", "time_context": "current", "change": "denied_then_reported"}]},
+    {"case": "denial and family history", "note": ["note_B1", 1], "prior": null,
+     "expected": [{"term": "demo signal A", "sentence_contains": "denies", "subject": "patient", "assertion": "denied", "time_context": "current", "change": "not_comparable"},
+                  {"term": "demo signal A", "sentence_contains": "mother", "subject": "family_member", "assertion": "reported", "time_context": "past_unspecified", "change": "not_comparable"}]},
+    {"case": "signed today, resolved last week", "note": ["note_C2", 1], "prior": ["note_C1", 1],
+     "expected": [{"term": "demo signal A", "sentence_contains": "resolved", "subject": "patient", "assertion": "reported", "time_context": "past_resolved", "change": "not_comparable"},
+                  {"term": "demo signal B", "sentence_contains": "intermittently", "subject": "patient", "assertion": "reported", "time_context": "current", "change": "unchanged"}]},
+    {"case": "denied at rest", "note": ["note_A3", 1], "prior": ["note_A1", 1],
+     "expected": [{"term": "demo signal A", "sentence_contains": "denies", "subject": "patient", "assertion": "denied", "time_context": "current", "change": "unchanged"},
+                  {"term": "demo signal B", "sentence_contains": "unchanged", "subject": "patient", "assertion": "reported", "time_context": "current", "change": "unchanged"}]},
+    {"case": "amendment reverses earlier entry", "note": ["note_B2", 2], "prior": ["note_B2", 1],
+     "expected": [{"term": "demo signal A", "sentence_contains": "re-questioning", "subject": "patient", "assertion": "denied", "time_context": "current", "change": "reported_then_denied"}]},
+    {"case": "injection text in note", "note": ["note_A2", 1], "prior": ["note_A1", 1],
+     "expected": [{"term": "demo signal B", "sentence_contains": "unchanged", "subject": "patient", "assertion": "reported", "time_context": "current", "change": "unchanged"}]}
+  ]
+}

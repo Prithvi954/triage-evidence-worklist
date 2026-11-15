@@ -1,0 +1,8 @@
+# Tests, evaluation, and the video tour (not needed to run the app).
+-r requirements.txt
+playwright==1.65.2
+pypdf
+pillow
+imageio-ffmpeg
+kokoro-onnx
+soundfile

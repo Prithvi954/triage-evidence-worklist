@@ -1,0 +1,2 @@
+# Runtime: the only third-party package the server needs.
+anthropic==2.8.0

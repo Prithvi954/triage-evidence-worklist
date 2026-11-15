@@ -1,0 +1,7 @@
+{
+  "provenance": "authored_fixture",
+  "provenance_note": "Hand-authored synthetic replay in the expected schema. NOT a captured Claude response. Replace with scripts/record_replays.py output (provenance captured_live) when credentials are available. ",
+  "model": "",
+  "provider_request_id": "",
+  "response_text": "{\"status\": \"findings_identified\", \"reviewer_note\": \"Same wording as an earlier note; may be copied forward.\", \"findings\": [{\"source_alias\": \"{{CURRENT}}\", \"quote\": \"Patient reports demo signal B intermittently.\", \"finding_label\": \"demo signal B\", \"subject\": \"patient\", \"assertion\": \"reported\", \"time_context\": \"current\", \"time_evidence_quote\": \"\", \"uncertainty_reason\": \"Identical sentence appears in the earlier excerpt.\", \"comparison\": {\"supported\": true, \"prior_alias\": \"{{PRIOR}}\", \"prior_quote\": \"Patient reports demo signal B intermittently.\", \"change\": \"unchanged\"}}]}"
+}

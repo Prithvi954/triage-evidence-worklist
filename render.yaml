@@ -1,0 +1,24 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# The Claude API key is NOT stored here. Render asks for it when you create the service
+# (sync: false), and keeps it as a secret environment variable.
+services:
+  - type: web
+    name: triage-evidence-worklist
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m app.server
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.2
+      - key: TRIAGE_MODE
+        value: live
+      - key: TRIAGE_HOST
+        value: 0.0.0.0
+      - key: TRIAGE_SECURE_COOKIES
+        value: "1"
+      - key: TRIAGE_DEMO_CONTROLS
+        value: "1"
+      - key: ANTHROPIC_API_KEY
+        sync: false

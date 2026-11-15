@@ -1,0 +1,7 @@
+{
+  "provenance": "authored_fixture",
+  "provenance_note": "Hand-authored synthetic replay in the expected schema. NOT a captured Claude response. Replace with scripts/record_replays.py output (provenance captured_live) when credentials are available. DELIBERATELY FLAWED: simulates a model error (drops 'denies') to test validation and clinician correction.",
+  "model": "",
+  "provider_request_id": "",
+  "response_text": "{\"status\": \"findings_identified\", \"reviewer_note\": \"\", \"findings\": [{\"source_alias\": \"{{CURRENT}}\", \"quote\": \"demo signal A at rest\", \"finding_label\": \"demo signal A\", \"subject\": \"patient\", \"assertion\": \"reported\", \"time_context\": \"current\", \"time_evidence_quote\": \"\", \"uncertainty_reason\": \"\", \"comparison\": {\"supported\": false, \"prior_alias\": \"\", \"prior_quote\": \"\", \"change\": \"not_comparable\"}}, {\"source_alias\": \"{{CURRENT}}\", \"quote\": \"Demo signal B unchanged.\", \"finding_label\": \"demo signal B\", \"subject\": \"patient\", \"assertion\": \"reported\", \"time_context\": \"current\", \"time_evidence_quote\": \"\", \"uncertainty_reason\": \"\", \"comparison\": {\"supported\": false, \"prior_alias\": \"\", \"prior_quote\": \"\", \"change\": \"not_comparable\"}}]}"
+}

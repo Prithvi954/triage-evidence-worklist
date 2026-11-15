@@ -1,0 +1,7 @@
+{
+  "provenance": "authored_fixture",
+  "provenance_note": "Hand-authored synthetic replay in the expected schema. NOT a captured Claude response. Replace with scripts/record_replays.py output (provenance captured_live) when credentials are available. ",
+  "model": "",
+  "provider_request_id": "",
+  "response_text": "{\"status\": \"findings_identified\", \"reviewer_note\": \"Earlier excerpt is from a note signed earlier in this visit.\", \"findings\": [{\"source_alias\": \"{{CURRENT}}\", \"quote\": \"Patient now reports demo signal A, which started while in the waiting area.\", \"finding_label\": \"demo signal A\", \"subject\": \"patient\", \"assertion\": \"reported\", \"time_context\": \"current\", \"time_evidence_quote\": \"started while in the waiting area\", \"uncertainty_reason\": \"\", \"comparison\": {\"supported\": true, \"prior_alias\": \"{{PRIOR}}\", \"prior_quote\": \"Patient denies demo signal A.\", \"change\": \"denied_then_reported\"}}, {\"source_alias\": \"{{PRIOR}}\", \"quote\": \"Patient's mother experienced demo signal A last year.\", \"finding_label\": \"demo signal A (family member)\", \"subject\": \"family_member\", \"assertion\": \"reported\", \"time_context\": \"past_unspecified\", \"time_evidence_quote\": \"last year\", \"uncertainty_reason\": \"\", \"comparison\": {\"supported\": false, \"prior_alias\": \"\", \"prior_quote\": \"\", \"change\": \"not_comparable\"}}]}"
+}

@@ -1,0 +1,170 @@
+WEBVTT
+
+1
+00:00:00.494 --> 00:00:10.788
+Welcome to the Triage Evidence Worklist. This is a practice demo with made-up patients. In about seven minutes, you'll see everything it does, step by step.
+
+2
+00:00:11.634 --> 00:00:18.403
+First, choose who you are. Riley is a nurse. Sam is the charge nurse, who makes the final decisions.
+
+3
+00:00:19.247 --> 00:00:21.170
+We'll start as Riley.
+
+4
+00:00:21.181 --> 00:00:26.455
+This is the main screen. Everything fits on one page, so there's no long scrolling.
+
+5
+00:00:27.277 --> 00:00:37.950
+On the left are the pages: Patients, Emergencies, Notes to review, Overdue, Practice tools, and Help. The colored badges show how many things need attention.
+
+6
+00:00:38.771 --> 00:00:44.109
+Across the top is the system status, plus the Voice button and text-size buttons.
+
+7
+00:00:45.058 --> 00:00:49.160
+The blue box is your guide. It always tells you what to do next.
+
+8
+00:00:50.037 --> 00:01:03.098
+This is the care queue. The patient at the top is seen first. The colored edge and badge show how urgent each patient is. Level 1 is the most urgent, and purple means nobody has assessed them yet.
+
+9
+00:01:04.007 --> 00:01:09.581
+Let's see what happens when a new note arrives. The guide says: send Patient B's new note.
+
+10
+00:01:11.394 --> 00:01:23.092
+A screen reader user hears a short message with no patient name, so nothing private is spoken out loud. And notice: the care queue did not change. The AI cannot move patients.
+
+11
+00:01:23.914 --> 00:01:28.702
+Let's open the new note. It opens on the right, and the list stays visible.
+
+12
+00:01:29.529 --> 00:01:35.571
+The yellow label says AI-assisted, unverified. A person always has to check it.
+
+13
+00:01:36.523 --> 00:01:46.959
+The first finding quotes the note exactly: Patient B now reports demo signal A. It also found that earlier, the patient denied it. So something changed.
+
+14
+00:01:47.795 --> 00:01:56.570
+The second finding is about the patient's mother, not the patient, so the AI kept it separate. A simple keyword search would get this wrong.
+
+15
+00:01:56.586 --> 00:02:05.530
+Under What Claude received, you can see exactly what was sent to the AI: two short excerpts, with no name, no record number, and no dates.
+
+16
+00:02:05.543 --> 00:02:12.761
+Now record your decision: Accept, Correct, or Reject. We'll accept. Your decision is saved with your name.
+
+17
+00:02:12.776 --> 00:02:20.675
+Only a charge nurse can change how urgent a patient is. Riley goes back to the list and keeps her place on Patient A.
+
+18
+00:02:20.687 --> 00:02:26.284
+Now Sam, in another window, approves Level 1 for Patient B. Watch the list.
+
+19
+00:02:27.165 --> 00:02:35.001
+Patient B moved to the top, but Riley's place stayed on Patient A. Pressing Enter opens Patient A, not someone else.
+
+20
+00:02:35.021 --> 00:02:44.756
+Next, emergencies. Clear, written rules can flag a possible emergency. Let's send a practice note where Patient D reports a warning sign.
+
+21
+00:02:45.568 --> 00:02:54.278
+A red banner appears, and the Emergencies badge lights up. A screen reader user hears an urgent alert, still without the patient's name.
+
+22
+00:02:55.446 --> 00:02:59.868
+A flag never moves a patient by itself. Any nurse can check it.
+
+23
+00:02:59.885 --> 00:03:05.115
+Open it to see why it was flagged: the rule, and the exact sentence from the note.
+
+24
+00:03:05.130 --> 00:03:12.367
+Riley checks the patient and answers yes or no. Writing a reason is required, so everyone can see why.
+
+25
+00:03:12.385 --> 00:03:17.234
+Save the check. It's added to the history, and the charge nurse can now see it.
+
+26
+00:03:17.249 --> 00:03:27.196
+Sam, the charge nurse, reads Riley's reason and makes the final decision: confirmed emergency. Sam can change it again later if things change.
+
+27
+00:03:28.079 --> 00:03:36.170
+Confirming the emergency moved Patient D to Level 1, and every step is saved with a name, a time, and a reason.
+
+28
+00:03:36.180 --> 00:03:44.656
+Now the patient chart. Like big hospital systems, it has tabs: Summary, Notes and documents, Write note, and Emergencies.
+
+29
+00:03:44.674 --> 00:03:48.585
+The Notes and documents tab shows every note, newest first.
+
+30
+00:03:48.599 --> 00:03:55.047
+Use the search bar to find words. Let's search for denies. Every match is highlighted in yellow.
+
+31
+00:03:55.061 --> 00:04:01.041
+To write a note, open Write note. You can type, or press Start dictation and simply speak.
+
+32
+00:04:01.851 --> 00:04:09.878
+Notes you write or dictate stay on this server. They're never sent to the AI, and the emergency rules check them automatically.
+
+33
+00:04:09.890 --> 00:04:13.695
+Save it, and it appears in the chart with your name and the time.
+
+34
+00:04:13.719 --> 00:04:23.112
+The Voice button lets you control the app by speaking. Press Start listening and say something like: bring up patient C. You can also type the command.
+
+35
+00:04:23.126 --> 00:04:30.130
+And Patient C's chart opens. This helps nurses who can't easily use a mouse, or whose hands are busy.
+
+36
+00:04:30.983 --> 00:04:37.770
+Try other commands too, like take a note for patient B, search for denies, or open emergencies.
+
+37
+00:04:37.885 --> 00:04:42.859
+Pin any note to keep it on screen as a sticky note while you look at other patients.
+
+38
+00:04:42.872 --> 00:04:51.069
+The Overdue page shows late tasks and who is responsible. If someone runs late, a backup is assigned automatically.
+
+39
+00:04:51.082 --> 00:04:56.209
+What if the AI stops working? Here we pretend it's down, and send another note.
+
+40
+00:04:57.057 --> 00:05:03.525
+The note still shows up, marked manual review required. Everything else keeps working without the AI.
+
+41
+00:05:03.582 --> 00:05:10.096
+Need a reminder of what a word means? Open Help and words. And use the A buttons to make text bigger.
+
+42
+00:05:10.115 --> 00:05:20.167
+That's the tour. Remember: the AI suggests, and people decide. To practice again, open Practice tools and press Reset all demo data.
+

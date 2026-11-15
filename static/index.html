@@ -1,0 +1,257 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Triage Evidence Worklist (practice demo)</title>
+<link rel="stylesheet" href="/app.css">
+<script src="/app.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to main content</a>
+
+<!-- Single polite live region. Automatic announcements are generic: no patient label, no clinical text. -->
+<div id="announcer" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+<!-- Assertive region used ONLY for possible emergencies (important and time-sensitive). Still no patient name. -->
+<div id="announcer-urgent" class="visually-hidden" role="alert" aria-atomic="true"></div>
+
+<!-- ============ Sign-in ============ -->
+<section id="login" class="login-screen" aria-labelledby="login-h" hidden>
+  <div class="login-panel">
+    <div class="brand brand-lg"><span class="brand-mark" aria-hidden="true">+</span><span>Triage Evidence Worklist</span></div>
+    <p class="demo-flag">Practice demo · made-up patients · not for real patient care</p>
+    <h1 id="login-h" tabindex="-1">Welcome. Choose who you are for this practice.</h1>
+    <div class="welcome">
+      <p>This tool helps nurses notice when a patient's notes say something new, like a symptom the patient denied earlier but reports now.</p>
+      <ul>
+        <li><strong>An AI helper reads new notes</strong> and points to the exact words that changed.</li>
+        <li><strong>A person always checks it.</strong> The AI cannot change who is seen first.</li>
+        <li><strong>Everything still works without the AI.</strong></li>
+      </ul>
+    </div>
+    <ul id="login-list" class="plain login-list"></ul>
+    <p class="hint">Sign-in here is pretend. A real hospital would use its own secure sign-in.</p>
+  </div>
+</section>
+
+<!-- ============ Workstation ============ -->
+<div id="app" class="shell" hidden>
+  <header class="topbar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">+</span><span>Triage Evidence Worklist</span>
+      <span class="demo-chip">Practice demo</span></div>
+    <dl class="statusbar" id="statusbar" aria-label="System status">
+      <div class="pill"><dt>AI helper</dt><dd id="s-mode">Loading</dd></div>
+      <div class="pill"><dt>Last AI check</dt><dd id="s-call">None yet</dd></div>
+      <div class="pill"><dt>Records feed</dt><dd id="s-feed">Loading</dd></div>
+      <div class="pill"><dt>Live updates</dt><dd id="s-conn">Connecting</dd></div>
+      <div class="pill"><dt>Clock</dt><dd id="s-clock">Loading</dd></div>
+    </dl>
+    <div class="topbar-right">
+      <div class="voice-wrap">
+        <button type="button" id="voice-btn" class="voice-btn" aria-expanded="false" aria-controls="voice-panel">
+          <span aria-hidden="true">🎤</span> Voice</button>
+        <section id="voice-panel" class="voice-panel" aria-labelledby="voice-h" hidden>
+          <h2 id="voice-h">Voice commands</h2>
+          <p class="hint">Press <strong>Start listening</strong> and say a command, or type it below.</p>
+          <div class="btns"><button type="button" id="voice-listen" class="primary" aria-pressed="false">Start listening</button>
+            <button type="button" id="voice-close">Close</button></div>
+          <form id="voice-form" class="voice-form">
+            <label for="voice-text">Or type a command</label>
+            <div class="search-row"><input id="voice-text" type="text" autocomplete="off" placeholder="bring up patient A">
+              <button type="submit">Go</button></div>
+          </form>
+          <p id="voice-result" class="voice-result" role="status"></p>
+          <details><summary>Things you can say</summary>
+            <ul class="examples">
+              <li>"Bring up patient A" or "Open patient C"</li>
+              <li>"Take a note for patient B" (starts dictation)</li>
+              <li>"Search for denies in patient B"</li>
+              <li>"Open emergencies", "Open notes to review", "Open overdue"</li>
+              <li>"Escalate patient D" or "Flag patient D emergency"</li>
+              <li>"Close"</li>
+            </ul></details>
+          <p id="voice-privacy" class="hint small"></p>
+        </section>
+      </div>
+      <div class="textsize" role="group" aria-label="Text size">
+        <button type="button" data-size="1" aria-pressed="true" aria-label="Normal text size">A</button>
+        <button type="button" data-size="1.18" aria-pressed="false" aria-label="Large text size">A+</button>
+        <button type="button" data-size="1.36" aria-pressed="false" aria-label="Extra large text size">A++</button>
+      </div>
+      <div class="user"><span class="avatar" aria-hidden="true" id="avatar">?</span><span id="s-user">Not signed in</span></div>
+      <button type="button" id="logout" class="ghost">Sign out</button>
+    </div>
+  </header>
+
+  <nav class="sidebar" aria-label="Pages">
+    <ul>
+      <li><button type="button" class="nav" data-view="patients" aria-current="page"><span class="nav-ico" aria-hidden="true">▤</span>Patients<span class="badge" id="nav-patients"></span></button></li>
+      <li><button type="button" class="nav" data-view="emergencies"><span class="nav-ico" aria-hidden="true">!</span>Emergencies<span class="badge badge-red" id="nav-emerg"></span></button></li>
+      <li><button type="button" class="nav" data-view="inbox"><span class="nav-ico" aria-hidden="true">✉</span>Notes to review<span class="badge badge-alert" id="nav-inbox"></span></button></li>
+      <li><button type="button" class="nav" data-view="overdue"><span class="nav-ico" aria-hidden="true">⏱</span>Overdue<span class="badge badge-alert" id="nav-overdue"></span></button></li>
+      <li><button type="button" class="nav" data-view="tools"><span class="nav-ico" aria-hidden="true">⚙</span>Practice tools</button></li>
+      <li><button type="button" class="nav" data-view="help"><span class="nav-ico" aria-hidden="true">?</span>Help &amp; words</button></li>
+    </ul>
+    <p id="return-wrap" class="return" hidden><button type="button" id="return-btn" class="ghost-light">Return to previous patient</button></p>
+    <div class="sidebar-foot">
+      <p class="latest"><span class="latest-label">Latest update</span><span id="latest-text">None yet</span></p>
+    </div>
+  </nav>
+
+  <main id="main" class="main" tabindex="-1">
+    <div id="emerg-banner" class="emerg-banner" hidden>
+      <span class="emerg-icon" aria-hidden="true">!</span>
+      <strong id="emerg-banner-text">1 possible emergency needs checking.</strong>
+      <button type="button" id="emerg-banner-btn">Open emergencies</button>
+    </div>
+    <!-- Guide strip: always visible, compact -->
+    <section id="guide" aria-labelledby="guide-h" class="guide">
+      <div class="guide-head">
+        <h2 id="guide-h" tabindex="-1">What to do next</h2>
+        <span id="guide-progress" class="guide-progress"></span>
+        <div class="guide-tools">
+          <button type="button" id="guide-toggle" class="link" aria-expanded="true" aria-controls="guide-step">Hide tips</button>
+          <button type="button" id="guide-restart" class="link">Start over</button>
+        </div>
+      </div>
+      <p id="guide-step" class="guide-step"></p>
+      <div id="guide-actions" class="btns"></div>
+      <div id="guide-body-wrap" hidden></div>
+    </section>
+
+    <!-- View: patients -->
+    <section class="view" data-view="patients" aria-labelledby="queue-h">
+      <div class="view-head">
+        <h2 id="queue-h" tabindex="-1">Care queue, official order</h2>
+        <p class="hint">Top of the list is seen first. Press <strong>Review</strong> to open a chart beside the list.</p>
+      </div>
+      <ol id="queue" class="rows"></ol>
+      <details class="rule-details"><summary>How is this order decided?</summary><p class="rule" id="queue-rule"></p></details>
+    </section>
+
+    <!-- View: possible emergencies -->
+    <section class="view" data-view="emergencies" aria-labelledby="em-h" hidden>
+      <div class="view-head">
+        <h2 id="em-h" tabindex="-1">Possible emergencies</h2>
+        <p class="hint">Flags come from clear rules (or from a nurse). <strong>Every nurse can check a flag and must write why.</strong>
+          The charge nurse makes the final decision and can change it later. A flag never moves a patient by itself.</p>
+      </div>
+      <ol id="em-list" class="em-list"></ol>
+      <p id="em-empty" class="empty">No emergency flags right now.</p>
+      <details class="rule-details"><summary>Which rules raise a flag?</summary>
+        <p class="rule">Practice rules only (fictional "demo red flags"). A real hospital's clinical lead would set these. A rule does not fire
+          when the note says the patient denies it, when it is about a family member, or when it happened in the past.</p>
+        <ul id="em-rules"></ul></details>
+    </section>
+
+    <!-- View: notes to review -->
+    <section class="view" data-view="inbox" aria-labelledby="inbox-h" hidden>
+      <div class="view-head">
+        <h2 id="inbox-h" tabindex="-1">Evidence inbox</h2>
+        <p class="hint">New notes to read, oldest first. Open one, compare the AI's suggestion with the real note, then record your decision.</p>
+      </div>
+      <p id="ai-health" class="warn" hidden></p>
+      <ol id="inbox" class="rows"></ol>
+      <p id="inbox-empty" class="empty" hidden>Nothing to read right now. New notes will appear here.</p>
+      <details class="rule-details"><summary>How is this list ordered?</summary><p class="rule" id="inbox-rule"></p></details>
+    </section>
+
+    <!-- View: overdue -->
+    <section class="view" data-view="overdue" aria-labelledby="ob-h" hidden>
+      <div class="view-head">
+        <h2 id="ob-h" tabindex="-1">Overdue and owned actions</h2>
+        <p class="hint">Late tasks and who is responsible. Deadlines never move, even if the AI stops working.</p>
+      </div>
+      <div class="table-wrap card">
+        <table id="ob-table">
+          <caption id="ob-caption">Overdue actions</caption>
+          <thead><tr><th scope="col">Patient</th><th scope="col">Action</th><th scope="col">Due</th><th scope="col">Owner</th>
+            <th scope="col">Accepted by</th><th scope="col">Patient reached</th><th scope="col">Escalated to</th><th scope="col">Update</th></tr></thead>
+          <tbody id="ob-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- View: practice tools -->
+    <section class="view" data-view="tools" aria-labelledby="demo-h" hidden>
+      <div class="view-head">
+        <h2 id="demo-h" tabindex="-1">Practice tools</h2>
+        <p class="hint">These pretend to be the hospital's records system, so you can try things out. Start with the first button.</p>
+      </div>
+      <div class="tool-grid">
+        <fieldset class="card"><legend>Send a practice note</legend>
+          <div id="deliver-buttons" class="btns stack"></div>
+        </fieldset>
+        <fieldset class="card"><legend>Make the AI helper have a problem</legend>
+          <label for="fault">Problem to simulate</label>
+          <select id="fault">
+            <option value="none">No problem (normal)</option><option value="timeout">AI is too slow (timeout)</option>
+            <option value="rate_limit">AI is busy (rate limited)</option><option value="outage">AI is down (outage)</option>
+            <option value="malformed">AI gives a broken answer</option><option value="no_finding">AI finds nothing</option>
+            <option value="refusal">AI declines to answer</option>
+          </select>
+          <button type="button" id="fault-apply">Apply</button>
+        </fieldset>
+        <fieldset class="card"><legend>Time and records feed</legend>
+          <div class="btns stack">
+            <button type="button" data-sim-clock="5">Move clock ahead 5 minutes</button>
+            <button type="button" data-sim-clock="15">Move clock ahead 15 minutes</button>
+            <button type="button" id="feed-stall">Stop the records feed</button>
+            <button type="button" id="feed-resume">Restart the records feed</button>
+          </div>
+        </fieldset>
+        <fieldset class="card"><legend>Access and data</legend>
+          <div class="btns stack">
+            <button type="button" id="close-a">Close Patient A's encounter</button>
+            <button type="button" id="revoke-me">Revoke my access</button>
+            <button type="button" id="reset" class="danger">Reset all demo data</button>
+          </div>
+        </fieldset>
+      </div>
+    </section>
+
+    <!-- View: help -->
+    <section class="view" data-view="help" aria-labelledby="help-h" hidden>
+      <div class="view-head"><h2 id="help-h" tabindex="-1">Help and words</h2></div>
+      <div class="card glossary">
+        <dl>
+          <dt>Care queue</dt><dd>The official list of waiting patients. The top patient is seen first.</dd>
+          <dt>Level 1 to 4</dt><dd>How urgent a patient is. Level 1 is the most urgent. "Unassessed" means nobody has checked them yet.</dd>
+          <dt>Notes to review</dt><dd>New or changed notes a nurse still needs to read. Oldest first.</dd>
+          <dt>AI-assisted, unverified</dt><dd>The AI helper made a suggestion. A person has not checked it yet. It might be wrong.</dd>
+          <dt>Quote</dt><dd>The exact words from the note. Always compare them with the full note.</dd>
+          <dt>Pin note</dt><dd>Keeps a note open in a small sticky window while you look at other things.</dd>
+          <dt>Escalate</dt><dd>Ask the charge nurse for help right away. You never have to wait for the AI.</dd>
+          <dt>Overdue</dt><dd>A task whose time has passed. It goes to a backup person automatically.</dd>
+          <dt>Charge nurse</dt><dd>The nurse in charge of the shift. Only they can change a patient's level in this demo.</dd>
+        </dl>
+      </div>
+      <div class="card">
+        <h3>Keyboard tips</h3>
+        <ul>
+          <li><kbd>Tab</kbd> moves between buttons. <kbd>Enter</kbd> opens what is focused.</li>
+          <li>When the list reorders, your place stays on the same patient.</li>
+          <li>Screen reader users: use heading navigation to jump between the list, the chart, and pinned notes.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <!-- Docked chart / note panel: stays on screen beside the list -->
+  <section id="detail" class="detail" aria-labelledby="detail-h" hidden>
+    <div class="detail-head">
+      <h2 id="detail-h" tabindex="-1">Detail</h2>
+      <button type="button" id="detail-close" class="icon-btn" aria-label="Close panel">✕</button>
+    </div>
+    <div id="detail-body" class="detail-body"></div>
+  </section>
+
+  <!-- Pinned sticky notes: non-modal, stay open while you work -->
+  <aside id="pins" class="pins" aria-labelledby="pins-h" hidden>
+    <h2 id="pins-h" class="visually-hidden">Pinned notes</h2>
+    <button type="button" id="pins-toggle" class="pins-toggle" aria-expanded="true" aria-controls="pins-list">Pinned notes</button>
+    <div id="pins-list" class="pins-list"></div>
+  </aside>
+</div>
+</body>
+</html>

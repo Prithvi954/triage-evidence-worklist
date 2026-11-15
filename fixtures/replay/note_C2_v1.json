@@ -1,0 +1,7 @@
+{
+  "provenance": "authored_fixture",
+  "provenance_note": "Hand-authored synthetic replay in the expected schema. NOT a captured Claude response. Replace with scripts/record_replays.py output (provenance captured_live) when credentials are available. ",
+  "model": "",
+  "provider_request_id": "",
+  "response_text": "{\"status\": \"findings_identified\", \"reviewer_note\": \"The note is a late entry signed today; the demo signal A statement describes last week.\", \"findings\": [{\"source_alias\": \"{{CURRENT}}\", \"quote\": \"Demo signal A resolved last week and has not recurred.\", \"finding_label\": \"demo signal A\", \"subject\": \"patient\", \"assertion\": \"reported\", \"time_context\": \"past_resolved\", \"time_evidence_quote\": \"last week\", \"uncertainty_reason\": \"\", \"comparison\": {\"supported\": false, \"prior_alias\": \"\", \"prior_quote\": \"\", \"change\": \"not_comparable\"}}, {\"source_alias\": \"{{CURRENT}}\", \"quote\": \"Patient reports demo signal B intermittently.\", \"finding_label\": \"demo signal B\", \"subject\": \"patient\", \"assertion\": \"reported\", \"time_context\": \"current\", \"time_evidence_quote\": \"\", \"uncertainty_reason\": \"\", \"comparison\": {\"supported\": true, \"prior_alias\": \"{{PRIOR}}\", \"prior_quote\": \"Patient reports demo signal B intermittently.\", \"change\": \"unchanged\"}}]}"
+}

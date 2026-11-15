@@ -1,0 +1,7 @@
+{
+  "provenance": "authored_fixture",
+  "provenance_note": "Hand-authored synthetic replay in the expected schema. NOT a captured Claude response. Replace with scripts/record_replays.py output (provenance captured_live) when credentials are available. ",
+  "model": "",
+  "provider_request_id": "",
+  "response_text": "{\"status\": \"conflicting_evidence\", \"reviewer_note\": \"The amended note reverses the earlier version for demo signal A and attributes the earlier entry to demo signal B.\", \"findings\": [{\"source_alias\": \"{{CURRENT}}\", \"quote\": \"On re-questioning, patient denies demo signal A; the earlier entry referred to demo signal B.\", \"finding_label\": \"demo signal A\", \"subject\": \"patient\", \"assertion\": \"denied\", \"time_context\": \"current\", \"time_evidence_quote\": \"\", \"uncertainty_reason\": \"\", \"comparison\": {\"supported\": true, \"prior_alias\": \"{{PRIOR}}\", \"prior_quote\": \"Patient now reports demo signal A, which started while in the waiting area.\", \"change\": \"reported_then_denied\"}}, {\"source_alias\": \"{{CURRENT}}\", \"quote\": \"the earlier entry referred to demo signal B\", \"finding_label\": \"demo signal B\", \"subject\": \"patient\", \"assertion\": \"uncertain\", \"time_context\": \"unclear\", \"time_evidence_quote\": \"\", \"uncertainty_reason\": \"The amendment says the earlier entry referred to demo signal B but does not say whether it is present now.\", \"comparison\": {\"supported\": false, \"prior_alias\": \"\", \"prior_quote\": \"\", \"change\": \"not_comparable\"}}]}"
+}
