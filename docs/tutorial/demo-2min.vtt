@@ -1,0 +1,78 @@
+WEBVTT
+
+1
+00:00:00.430 --> 00:00:04.539
+A.I Triage System. Two-minute demo.
+
+2
+00:00:05.391 --> 00:00:12.447
+A nurse who uses a screen reader signs in. New notes arrive. Claude finds the evidence; people decide.
+
+3
+00:00:13.293 --> 00:00:20.047
+The official order: top is seen first. Colors show urgency. The AI can never move a patient.
+
+4
+00:00:20.885 --> 00:00:24.687
+A new note for Patient B arrives…
+
+5
+00:00:26.301 --> 00:00:32.148
+Screen reader hears: “New evidence awaiting clinical review.” No name, no symptom. Order unchanged.
+
+6
+00:00:32.158 --> 00:00:36.489
+Exact quotes from the note, labeled AI-assisted and unverified.
+
+7
+00:00:37.439 --> 00:00:41.770
+It caught the change: denied at triage, now reported.
+
+8
+00:00:42.626 --> 00:00:47.865
+And kept the mother’s history separate. A keyword search gets this wrong.
+
+9
+00:00:47.878 --> 00:00:53.420
+What Claude received: two short excerpts. No name, no record number, no dates.
+
+10
+00:00:53.437 --> 00:00:58.982
+Riley checks it against the real note and accepts. Saved with her name.
+
+11
+00:00:58.996 --> 00:01:05.142
+Riley goes back to Patient A. Meanwhile the charge nurse approves Level 1 for B…
+
+12
+00:01:06.507 --> 00:01:13.868
+B jumps to the top, but Riley’s place stays on A. Enter opens Patient A, not the wrong patient.
+
+13
+00:01:13.891 --> 00:01:19.738
+A rule flags a possible emergency for Patient D. Urgent alert, still no name.
+
+14
+00:01:19.752 --> 00:01:24.079
+Any nurse checks it — and must write why.
+
+15
+00:01:24.091 --> 00:01:30.846
+The charge nurse reads the reason and confirms. Patient D moves to Level 1, with full history.
+
+16
+00:01:30.856 --> 00:01:36.095
+An Epic-style chart with tabs. Search the notes — matches light up.
+
+17
+00:01:36.103 --> 00:01:41.041
+Hands busy? Speak: “bring up patient C.” Dictation writes notes too.
+
+18
+00:01:41.101 --> 00:01:47.251
+If the AI goes down, notes still show up for manual review. Nothing is lost.
+
+19
+00:01:47.261 --> 00:01:52.505
+The AI suggests. People decide. Accessible, private, and works without AI.
+
