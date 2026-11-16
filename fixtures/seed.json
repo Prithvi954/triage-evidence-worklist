@@ -61,6 +61,12 @@
         "dob": "DOB-FAKE-A",
         "address": "1 Fictional Way",
         "phone": "000-000-0001"
+      },
+      "display": {
+        "age": 34,
+        "sex": "F",
+        "complaint": "Demo concern X",
+        "location": "Room 4"
       }
     },
     {
@@ -78,6 +84,12 @@
         "dob": "DOB-FAKE-B",
         "address": "2 Fictional Way",
         "phone": "000-000-0002"
+      },
+      "display": {
+        "age": 61,
+        "sex": "M",
+        "complaint": "Demo concern X",
+        "location": "Lobby"
       }
     },
     {
@@ -95,6 +107,12 @@
         "dob": "DOB-FAKE-C",
         "address": "3 Fictional Way",
         "phone": "000-000-0003"
+      },
+      "display": {
+        "age": 27,
+        "sex": "F",
+        "complaint": "Demo concern Y",
+        "location": "Room 2"
       }
     },
     {
@@ -110,6 +128,12 @@
         "dob": "DOB-FAKE-D",
         "address": "4 Fictional Way",
         "phone": "000-000-0004"
+      },
+      "display": {
+        "age": 45,
+        "sex": "M",
+        "complaint": "Demo concern Z",
+        "location": "Triage 1"
       }
     },
     {
@@ -127,6 +151,12 @@
         "dob": "DOB-FAKE-S",
         "address": "9 Elsewhere Rd",
         "phone": "000-000-0009"
+      },
+      "display": {
+        "age": 52,
+        "sex": "F",
+        "complaint": "Demo concern Y",
+        "location": "Room 1"
       }
     }
   ],

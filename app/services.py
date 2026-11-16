@@ -517,6 +517,7 @@ class Service:
                 "priority_confirmed_by": uname(e["priority_confirmed_by"]), "priority_confirmed_at": e["priority_confirmed_at"],
                 "arrived_at": e["arrived_at"], "primary": uname(e["primary_user"]) or "Unassigned (queue owner responsible)",
                 "obligations": [_ob_view(o, now_dt, uname) for o in eobs],
+                "display": self._display(e["id"]),
                 "unreviewed_notes": sum(1 for i in items if i["encounter_id"] == e["id"]),
                 "emergency": next((EMERGENCY_STATUS_TEXT[f["status"]] for f in flags if f["encounter_id"] == e["id"]), None),
                 "emergency_open": any(f["encounter_id"] == e["id"] and f["status"] in OPEN_FLAG for f in flags),
@@ -550,6 +551,11 @@ class Service:
                    "can_confirm_priority": user["role"] in CONFIRM_ROLES},
             "escalation_reasons": sorted(ESCALATION_REASONS),
         }
+
+    def _display(self, enc_id):
+        """Fictional demographics for the track board (synthetic seed only; never sent to the AI)."""
+        e = next((x for x in self.seed["encounters"] if x["id"] == enc_id), None)
+        return (e or {}).get("display", {})
 
     def review_item_detail(self, user, item_id):
         it = self._item_for(user, item_id)

@@ -126,7 +126,7 @@ class TestBrowserFocus(unittest.TestCase):
         self.assertIn("sign in as Sam", guide.text_content())
         # Text size control and hiding tips
         page.get_by_role("button", name="Extra large").click()
-        self.assertEqual(page.evaluate("document.documentElement.style.fontSize"), "145%")
+        self.assertEqual(page.evaluate("document.documentElement.style.fontSize"), "128%")
         page.get_by_role("button", name="Hide tips").click()
         self.assertTrue(page.locator("#guide-step").is_hidden())
         page.get_by_role("button", name="Show tips").click()

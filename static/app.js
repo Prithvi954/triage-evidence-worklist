@@ -172,9 +172,9 @@ function renderStatus() {
   $("s-clock").textContent = `${hhmm(S.now)} (practice)`;
   $("s-user").textContent = `${S.me.name}, ${S.me.title}`;
   $("avatar").textContent = S.me.name[0];
-  $("s-feed").closest(".pill").classList.toggle("is-bad", !!S.feed.stale);
-  $("s-conn").closest(".pill").classList.toggle("is-bad", connState === "down");
-  $("s-mode").closest(".pill").classList.toggle("is-live", m.setting === "live");
+  $("s-feed").closest(".st").classList.toggle("is-bad", !!S.feed.stale);
+  $("s-conn").closest(".st").classList.toggle("is-bad", connState === "down");
+  $("s-mode").closest(".st").classList.toggle("is-live", m.setting === "live");
   $("nav-patients").textContent = S.queue.length || "";
   $("nav-inbox").textContent = S.unreviewed || "";
   $("nav-overdue").textContent = S.overdue.length || "";
@@ -223,36 +223,48 @@ function renderQueue() {
   const removed = reconcile($("queue"), S.queue, (q) => q.encounter_id,
     (q) => {
       const li = el("li");
-      const desc = el("span", { class: "desc", id: `qd-${q.encounter_id}` });
-      li.append(
-        el("button", { type: "button", class: "open", "aria-describedby": desc.id, onclick: () => openEncounter(q.encounter_id) }),
-        desc,
-        el("button", { type: "button", class: "esc", onclick: () => openEscalate(q.encounter_id, q.label) }),
-        el("div", { class: "chips", "aria-hidden": "true" }));
+      const desc = el("span", { class: "desc visually-hidden", id: `qd-${q.encounter_id}` });
+      const cell = (cls) => el("span", { class: `cell ${cls}`, "aria-hidden": "true" });
+      const open = el("button", { type: "button", class: "open", "aria-describedby": desc.id, onclick: () => openEncounter(q.encounter_id) },
+        el("span", { class: "visually-hidden" }, "Review "), el("span", { class: "pt-name" }));
+      const esc = el("button", { type: "button", class: "esc", onclick: () => openEscalate(q.encounter_id, q.label) },
+        "Escalate", el("span", { class: "visually-hidden" }, ` concern for ${q.label}`));
+      li.append(cell("c-acu"), open, cell("c-demo"), cell("c-comp"), cell("c-loc"), cell("c-arr"), cell("c-due"), cell("c-rn"),
+        cell("c-flags"), desc, esc);
       return li;
     },
     (li, q) => {
-      li.querySelector(".open").textContent = `Review ${q.label}`;
-      li.querySelector(".esc").textContent = `Escalate concern for ${q.label}`;
+      const disp = q.display || {};
+      li.querySelector(".pt-name").textContent = q.label;
       const parts = [`Position ${q.position} of ${n}.`, `${q.priority_text}` +
         (q.priority_confirmed_by ? `, confirmed by ${q.priority_confirmed_by.split(",")[0]} at ${hhmm(q.priority_confirmed_at)}.` : ", no confirmed priority yet."),
+        disp.age ? `${disp.age} ${disp.sex === "F" ? "female" : "male"}, ${disp.complaint}, ${disp.location}.` : "",
         `Primary: ${q.primary}.`];
       for (const o of q.obligations) parts.push(`${cap(o.kind_text)} due ${hhmm(o.due_at)}, ${mins(o.minutes)}` +
         (o.overdue ? ", OVERDUE." : ".") + (o.kind === "bedside_review" && !o.accepted_by ? " Not yet accepted." : ""));
       parts.push(`Unreviewed notes: ${q.unreviewed_notes}.`);
       if (q.emergency) parts.unshift(`${q.emergency}.`);
-      li.querySelector(".desc").textContent = parts.join(" ");
-      li.classList.toggle("has-overdue", q.obligations.some((o) => o.overdue));
-      const lv = q.priority ? String(q.priority) : "u";
-      li.classList.remove("lvl-1", "lvl-2", "lvl-3", "lvl-4", "lvl-u"); li.classList.add(`lvl-${lv}`);
+      li.querySelector(".desc").textContent = parts.filter(Boolean).join(" ");
+      const overdue = q.obligations.some((o) => o.overdue);
+      li.classList.toggle("has-overdue", overdue);
       li.classList.toggle("is-open", !!(openDetail && openDetail.encounterId === q.encounter_id));
-      const chips = [el("span", { class: `lvl lvl-b-${lv}` }, q.priority_text), el("span", { class: "chip" }, `#${q.position}`)];
-      const od = q.obligations.filter((o) => o.overdue).length;
-      if (od) chips.push(el("span", { class: "chip overdue" }, `${od} overdue`));
-      if (q.emergency_open) chips.unshift(el("span", { class: "chip emergency" }, "Possible emergency"));
-      else if (q.emergency && q.emergency.startsWith("Emergency confirmed")) chips.unshift(el("span", { class: "chip emergency" }, "Emergency"));
-      if (q.unreviewed_notes) chips.push(el("span", { class: "chip notes" }, `${q.unreviewed_notes} new note${q.unreviewed_notes > 1 ? "s" : ""}`));
-      li.querySelector(".chips").replaceChildren(...chips);
+      const lv = q.priority ? String(q.priority) : "u";
+      li.querySelector(".c-acu").replaceChildren(el("span", { class: `acu acu-${lv}` }, q.priority ? String(q.priority) : "U"));
+      li.querySelector(".c-demo").textContent = disp.age ? `${disp.age} ${disp.sex}` : "";
+      li.querySelector(".c-comp").textContent = disp.complaint || "";
+      li.querySelector(".c-loc").textContent = disp.location || "";
+      const waitMin = Math.max(0, Math.round((Date.parse(S.now) - Date.parse(q.arrived_at)) / 60000));
+      li.querySelector(".c-arr").replaceChildren(document.createTextNode(hhmm(q.arrived_at)), el("span", { class: "sub" }, `${waitMin} min`));
+      const nx = q.obligations[0];
+      li.querySelector(".c-due").replaceChildren(...(nx ? [document.createTextNode(`${cap(nx.kind_text)}`),
+        el("span", { class: "sub" }, `${hhmm(nx.due_at)} · ${nx.overdue ? `${-nx.minutes} min late` : `in ${nx.minutes} min`}`)] : [document.createTextNode("—")]));
+      li.querySelector(".c-rn").textContent = (q.primary || "").split(",")[0];
+      const tags = [];
+      if (q.emergency_open) tags.push(el("span", { class: "tag tag-em" }, "Emerg?"));
+      else if (q.emergency && q.emergency.startsWith("Emergency confirmed")) tags.push(el("span", { class: "tag tag-em" }, "Emergency"));
+      if (overdue) tags.push(el("span", { class: "tag tag-od" }, "Overdue"));
+      if (q.unreviewed_notes) tags.push(el("span", { class: "tag tag-note" }, `Note ×${q.unreviewed_notes}`));
+      li.querySelector(".c-flags").replaceChildren(...tags);
     });
   if (removed) {
     $("queue-h").focus();
@@ -269,13 +281,23 @@ function renderInbox() {
   reconcile($("inbox"), S.inbox, (i) => i.item_id,
     (i) => {
       const li = el("li");
-      const desc = el("span", { class: "desc", id: `id-${i.item_id}` });
-      li.append(el("button", { type: "button", "aria-describedby": desc.id, onclick: () => openItem(i.item_id) }), desc);
+      const desc = el("span", { class: "desc cell", id: `id-${i.item_id}` });
+      li.append(el("button", { type: "button", class: "open-note", "aria-describedby": desc.id, onclick: () => openItem(i.item_id) }),
+        el("span", { class: "cell c-time", "aria-hidden": "true" }), el("span", { class: "cell c-ver", "aria-hidden": "true" }), desc);
       return li;
     },
     (li, i) => {
-      li.querySelector("button").textContent = `Open note review for ${i.label}, received ${hhmm(i.received_at)}` + (i.note_version > 1 ? ` (amended, version ${i.note_version})` : "");
-      li.querySelector(".desc").textContent = i.ai_state_text + ".";
+      const btn = li.querySelector("button");
+      btn.textContent = i.label;
+      btn.setAttribute("aria-label", `Open note review for ${i.label}, received ${hhmm(i.received_at)}`
+        + (i.note_version > 1 ? ` (amended, version ${i.note_version})` : ""));
+      li.querySelector(".c-time").textContent = `Recv ${hhmm(i.received_at)}`;
+      li.querySelector(".c-ver").textContent = i.note_version > 1 ? `Amended v${i.note_version}` : "New note";
+      const ai = i.ai_state;
+      const cls = ai === "findings" || ai === "conflicting_evidence" ? "tag-ai" : (ai.startsWith("failed_") || ai === "malformed"
+        || ai.startsWith("not_called") || ai.startsWith("blocked") || ai === "stale_discarded") ? "tag-od" : "tag-note";
+      li.querySelector(".desc").replaceChildren(el("span", { class: `tag ${cls}` }, ai === "findings" ? "AI evidence" : ai.replace(/_/g, " ").slice(0, 22)),
+        document.createTextNode(" " + i.ai_state_text + "."));
     });
 }
 
@@ -348,11 +370,16 @@ async function openEncounter(encId, keepFocus, tab = "summary") {
   const q = d.queue_row;
   const openFlags = d.emergencies.filter((f) => f.status === "awaiting_nurse" || f.status === "awaiting_charge");
 
+  const disp = (q && q.display) || {};
   const header = el("div", { class: "chart-header" },
     el("div", { class: "chart-id" },
+      el("span", { class: "pt" }, d.label),
+      disp.age ? el("span", {}, `${disp.age} y · ${disp.sex}`) : null,
       el("span", { class: `lvl lvl-b-${q && q.priority ? q.priority : "u"}` }, q ? q.priority_text : d.status),
-      el("span", {}, `Encounter ID ${d.encounter_id}`),
-      q ? el("span", {}, `Position ${q.position} · Primary: ${q.primary}`) : null),
+      disp.complaint ? el("span", {}, `CC: ${disp.complaint}`) : null,
+      disp.location ? el("span", {}, disp.location) : null,
+      el("span", {}, `Enc ${d.encounter_id}`),
+      q ? el("span", {}, `RN: ${q.primary.split(",")[0]}`) : null),
     openFlags.length ? el("p", { class: "bad emerg-inline" }, el("strong", {}, "Possible emergency. "),
       `${openFlags[0].status_text}. `,
       el("button", { type: "button", onclick: () => openEmergency(openFlags[0].id) }, `Check ${d.label}'s possible emergency`)) : null);
@@ -979,7 +1006,7 @@ function applyHidden() {
 }
 
 function setTextSize(scale) {
-  document.documentElement.style.fontSize = `${Math.round(scale * 106.25)}%`;
+  document.documentElement.style.fontSize = `${Math.round(scale * 93.75)}%`;
   document.querySelectorAll("[data-size]").forEach((b) => b.setAttribute("aria-pressed", String(Number(b.dataset.size) === scale)));
   try { localStorage.setItem("textsize", String(scale)); } catch (_) { /* ignore */ }
 }
