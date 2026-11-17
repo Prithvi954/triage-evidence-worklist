@@ -348,7 +348,10 @@ class Service:
             for s in ex.sources:
                 subst["{{CURRENT}}" if s["role"] == "current_note_excerpt" else "{{PRIOR}}"] = s["alias"]
             self._hook("before_call")
-            res = self.adapter.extract(req, (note["note_id"], note["version"]), subst)
+            rep = self.db.one("SELECT replay_note_id, replay_version FROM note_replay WHERE note_id=? AND version=?",
+                              (note["note_id"], note["version"]))
+            replay_key = (rep["replay_note_id"], rep["replay_version"]) if rep else (note["note_id"], note["version"])
+            res = self.adapter.extract(req, replay_key, subst)
         except BoundaryViolation as e:
             report_error(now, "adapter.boundary", e, item=item["id"])
             self._record_call(call_id, item, note, None, "blocked", None, "", "", "", None)
@@ -667,6 +670,7 @@ class Service:
             "me": {"id": user["id"], "name": user["name"], "title": user["title"], "role": user["role"],
                    "can_confirm_priority": user["role"] in CONFIRM_ROLES},
             "escalation_reasons": sorted(ESCALATION_REASONS),
+            "training": self.education.training_info(user) if getattr(self, "education", None) else None,
         }
 
     def _display(self, enc_id):

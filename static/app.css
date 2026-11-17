@@ -337,3 +337,4 @@ body.page { min-height: 100vh; }
 .stat.good .n { color: var(--ok-fg); }
 .stat.bad .n { color: var(--bad-fg); }
 @media (max-width: 40rem) { .form-grid { grid-template-columns: 1fr; } }
+.stack-gap { display: grid; gap: .6rem; }

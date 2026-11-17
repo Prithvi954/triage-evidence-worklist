@@ -78,9 +78,14 @@ class App:
             self.seed = json.load(f)
         self.adapter = Adapter(self.settings, load_allowlist(SEED), os.path.join(config.ROOT, "fixtures", "replay"))
         self.svc = Service(self.settings, self.clock, self.store, self.adapter, self.seed)
+        from .education import Education
+        self.education = Education(self.svc)
+        self.adapter.is_approved = lambda digest: bool(self.store.one("SELECT 1 FROM approved_texts WHERE sha=?", (digest,)))
+        self.adapter.allow_real_notes = self.settings.ai_may_send_real_notes()
         self.broker = Broker()
         if not self.store.one("SELECT 1 FROM orgs LIMIT 1"):
             self.svc.seed_db()
+        self.education.seed_builtin()
         fault = self.store.one("SELECT v FROM sim WHERE k='provider_fault'")
         self.adapter.fault = fault["v"] if fault else "none"
         self._stop = threading.Event()
@@ -299,6 +304,44 @@ def make_handler(app: App):
                 return self._json(200, svc.escalate(user, p[1], str(b.get("reason_code", ""))))
             if m == "POST" and len(p) == 3 and p[0] == "obligations":
                 return self._json(200, svc.obligation_action(user, p[1], p[2]))
+            # ---- education: scenario library, case builder, training sessions, results
+            edu = app.education
+            if p and p[0] == "learn":
+                if m == "GET" and p == ["learn", "scenarios"]:
+                    return self._json(200, edu.list_scenarios(user))
+                if m == "POST" and p == ["learn", "scenarios"]:
+                    return self._json(200, edu.save_scenario(user, None, self._body()))
+                if len(p) == 3 and p[1] == "scenarios":
+                    if m == "GET":
+                        return self._json(200, edu.get_scenario(user, p[2]))
+                    if m == "POST":
+                        return self._json(200, edu.save_scenario(user, p[2], self._body()))
+                if m == "POST" and len(p) == 4 and p[1] == "scenarios":
+                    b = self._body()
+                    if p[3] == "submit":
+                        return self._json(200, edu.submit_scenario(user, p[2]))
+                    if p[3] == "review":
+                        return self._json(200, edu.review_scenario(user, p[2], b.get("action"), str(b.get("comment", ""))))
+                    if p[3] == "delete":
+                        return self._json(200, edu.delete_scenario(user, p[2]))
+                    if p[3] == "start":
+                        ck = cookies.SimpleCookie(self.headers.get("Cookie", ""))
+                        r = edu.start_session(user, p[2], ck["sid"].value if "sid" in ck else "")
+                        return self._json(200, {"ok": True, "session_id": r["session_id"], "home": "/"},
+                                          extra={"Set-Cookie": self._cookie(r["token"])})
+                if m == "GET" and p == ["learn", "sessions"]:
+                    return self._json(200, edu.sessions(user))
+                if m == "GET" and len(p) == 3 and p[1] == "sessions":
+                    return self._json(200, edu.session_result(user, p[2]))
+                raise NotFound()
+            if p and p[0] == "training" and m == "POST":
+                if p == ["training", "next"]:
+                    return self._json(200, edu.next_event(user))
+                if p in (["training", "finish"], ["training", "leave"]):
+                    r = edu.finish(user) if p[1] == "finish" else edu.leave(user)
+                    target = f"/learn.html#result={r['session_id']}" if p[1] == "finish" else "/learn.html"
+                    return self._json(200, {"ok": True, "home": target}, extra={"Set-Cookie": self._cookie(r["parent_token"])})
+                raise NotFound()
             if p and p[0] == "sim":
                 return self._sim(m, p[1:], user)
             raise NotFound()

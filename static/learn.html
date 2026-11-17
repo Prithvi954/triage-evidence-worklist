@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Learning hub · Triage Evidence Worklist</title>
+<link rel="stylesheet" href="/app.css">
+<script src="/common.js" defer></script>
+<script src="/learn.js" defer></script>
+</head>
+<body class="page">
+<a class="skip" href="#main">Skip to main content</a>
+<div id="announcer" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+<div class="env-banner">Training environment · synthetic patients only · not for clinical use</div>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z"/></svg></span>
+    <span class="product">Triage Evidence Worklist</span><span class="dept">Learning hub</span>
+  </div>
+  <div class="topbar-right">
+    <div class="user"><span class="avatar" aria-hidden="true" id="avatar">?</span><span id="s-user"></span></div>
+    <button type="button" id="logout" class="tb-btn">Sign out</button>
+  </div>
+</header>
+<nav class="subnav" aria-label="Learning hub sections">
+  <button type="button" data-tab="library" aria-current="page">Scenario library</button>
+  <button type="button" data-tab="mine">My cases</button>
+  <button type="button" data-tab="review" hidden>Cases to review</button>
+  <button type="button" data-tab="results">Results</button>
+  <button type="button" data-tab="students" hidden>Students</button>
+  <button type="button" data-tab="help">How it works</button>
+</nav>
+<main id="main" class="page-main" tabindex="-1">
+  <section data-panel="library" aria-labelledby="lib-h">
+    <h1 id="lib-h" tabindex="-1">Scenario library</h1>
+    <p class="hint">Practice on made-up patients. Each scenario opens in your own private practice unit and is scored when you finish.</p>
+    <div id="lib-cards" class="cards"></div>
+  </section>
+
+  <section data-panel="mine" aria-labelledby="mine-h" hidden>
+    <h1 id="mine-h" tabindex="-1">My cases</h1>
+    <p class="hint">Build your own practice patients, notes and emergencies. Practice them privately, then submit them to your class.
+      Your instructor reviews submitted cases before they join the class library.</p>
+    <p><button type="button" class="primary" id="new-case">Build a new case</button></p>
+    <div id="mine-cards" class="cards"></div>
+  </section>
+
+  <section data-panel="review" aria-labelledby="rev-h" hidden>
+    <h1 id="rev-h" tabindex="-1">Cases to review</h1>
+    <p class="hint">Student cases waiting for approval. Approving adds a case to the class library and allows its text to be used with the AI.</p>
+    <div id="rev-cards" class="cards"></div>
+  </section>
+
+  <section data-panel="results" aria-labelledby="res-h" hidden>
+    <h1 id="res-h" tabindex="-1">Results</h1>
+    <div class="table-wrap"><table><caption id="res-cap">Practice sessions</caption>
+      <thead><tr><th scope="col">Learner</th><th scope="col">Scenario</th><th scope="col">Started</th><th scope="col">Score</th><th scope="col"></th></tr></thead>
+      <tbody id="res-body"></tbody></table></div>
+    <div id="result-detail"></div>
+  </section>
+
+  <section data-panel="students" aria-labelledby="stu-h" hidden>
+    <h1 id="stu-h" tabindex="-1">Students</h1>
+    <div class="panel">
+      <h2>Add a learner</h2>
+      <form id="stu-form" class="form-grid">
+        <label for="stu-name">Display name</label><input id="stu-name" type="text" required maxlength="60">
+        <label for="stu-user">Username</label><input id="stu-user" type="text" required autocapitalize="none" spellcheck="false" maxlength="40">
+        <label for="stu-role">Role</label><select id="stu-role"><option value="student">Student</option><option value="instructor">Instructor</option></select>
+        <label for="stu-title">Program (optional)</label><input id="stu-title" type="text" maxlength="80" placeholder="Nursing student, MS3, PGY-1…">
+        <label for="stu-pass">Temporary password</label><input id="stu-pass" type="password" required autocomplete="new-password">
+        <div></div><button type="submit" class="primary">Add learner</button>
+      </form>
+      <p id="stu-result" class="form-result" tabindex="-1"></p>
+    </div>
+    <div class="table-wrap"><table><caption>Accounts</caption>
+      <thead><tr><th scope="col">Name</th><th scope="col">Username</th><th scope="col">Role</th><th scope="col">Program</th></tr></thead>
+      <tbody id="stu-body"></tbody></table></div>
+  </section>
+
+  <section data-panel="help" aria-labelledby="help2-h" hidden>
+    <h1 id="help2-h" tabindex="-1">How it works</h1>
+    <div class="panel">
+      <ol>
+        <li><strong>Pick a scenario</strong> and press <em>Start practice</em>. A private practice unit opens with its own patients.</li>
+        <li><strong>Work the board like a real shift.</strong> New notes arrive when you press <em>Next event</em>. Check the AI's evidence
+          against the real note, correct it when it's wrong, check emergency flags and write your reasons, escalate, and set acuity.</li>
+        <li><strong>Finish</strong> to see your score: notes reviewed, AI mistakes caught, emergency calls, reasons, acuity, escalation,
+          and restricted-record access.</li>
+        <li><strong>Build your own case</strong> in <em>My cases</em>: add patients, notes over time, emergencies and the right answers.
+          Practice it yourself, then submit it to your class.</li>
+      </ol>
+      <p class="hint">Use only made-up details. The case builder blocks things that look like real names, record numbers, dates of birth,
+        phone numbers or addresses. Your cases are sent to the AI only after an instructor approves them.</p>
+    </div>
+  </section>
+
+  <section id="editor" aria-labelledby="ed-h" hidden>
+    <h1 id="ed-h" tabindex="-1">Case builder</h1>
+    <form id="ed-form">
+      <div class="panel form-grid">
+        <label for="ed-title">Title</label><input id="ed-title" type="text" required maxlength="80">
+        <label for="ed-summary">Summary</label><textarea id="ed-summary" rows="2" maxlength="500"></textarea>
+        <label for="ed-goals">Learning goals</label><input id="ed-goals" type="text" maxlength="300">
+        <label for="ed-role">Learner plays</label>
+        <select id="ed-role"><option value="rn">Staff nurse</option><option value="charge_rn">Charge nurse</option><option value="provider">Resident / provider</option></select>
+      </div>
+      <h2>Patients</h2>
+      <p class="hint">Use made-up labels like “Patient H” or “Bed 4”. Answers are what a good learner should decide.</p>
+      <div id="ed-patients" class="stack-gap"></div>
+      <p><button type="button" id="add-patient">Add a patient</button></p>
+      <h2>Notes over time</h2>
+      <p class="hint">Event 0 = already in the chart at the start. Event 1, 2, 3… arrive each time the learner presses <em>Next event</em>.
+        Words like “demo red flag R” trigger the practice emergency rules; “demo signal A/B” are the terms the AI looks for.</p>
+      <div id="ed-notes" class="stack-gap"></div>
+      <p><button type="button" id="add-note">Add a note</button></p>
+      <div class="panel">
+        <p><input type="checkbox" id="ed-attest"> <label for="ed-attest">Every detail in this case is made up. It contains no real patient information.</label></p>
+        <div class="btns"><button type="submit" class="primary">Save case</button><button type="button" id="ed-cancel">Cancel</button></div>
+        <p id="ed-result" class="form-result" tabindex="-1" role="alert"></p>
+      </div>
+    </form>
+  </section>
+</main>
+</body>
+</html>

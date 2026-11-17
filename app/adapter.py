@@ -97,6 +97,8 @@ class Adapter:
         self.fault = "none"          # demo/test fault injection: none|timeout|rate_limit|outage|malformed|no_finding|refusal
         self._client = None
         self.sent_requests = []      # test/demo capture of outbound bodies (synthetic fixtures only)
+        self.is_approved = lambda digest: False   # set by the app: approved synthetic scenario text
+        self.allow_real_notes = False             # set by the app: only in clinical mode with a confirmed BAA
 
     # ---- gates -------------------------------------------------------------------------
     def check_fixture_boundary(self, alias_map: dict, sources: list, fixture_bodies: dict) -> None:
@@ -107,7 +109,15 @@ class Adapter:
             key = (ref["note_id"], ref["version"])
             expected = self.allowlist.get(key)
             body = fixture_bodies.get(key)
-            if expected is None or body is None or sha(body) != expected:
+            if body is None:
+                raise BoundaryViolation("source text missing")
+            if self.allow_real_notes:
+                pass   # clinical deployment with a confirmed BAA: real notes may be sent (still minimized below)
+            elif expected is not None and sha(body) == expected:
+                pass   # a seeded synthetic fixture, unmodified
+            elif self.is_approved(sha(body)):
+                pass   # built-in or instructor-approved synthetic scenario text
+            else:
                 raise BoundaryViolation("source is not an approved, unmodified synthetic fixture")
             from .excerpt import scrub
             for part in s["text"].split(" [...] "):

@@ -162,7 +162,7 @@ async function refresh() {
   try { st = await api("GET", "/api/state"); }
   catch (e) { if (e.status === 403) accessEnded(); return; }
   S = st;
-  renderStatus(); renderQueue(); renderInbox(); renderOverdue(); checkOpenDetail(); renderGuide();
+  renderStatus(); renderQueue(); renderInbox(); renderOverdue(); checkOpenDetail(); renderGuide(); renderTraining();
   loadEmergencies();
 }
 
@@ -1248,3 +1248,30 @@ function privacyBind() {
   });
 }
 document.addEventListener("DOMContentLoaded", privacyBind);
+
+// ---------------------------------------------------------------- practice sessions (education mode)
+function renderTraining() {
+  const t = S && S.training;
+  $("training-bar").hidden = !t;
+  document.body.classList.toggle("in-training", !!t);
+  if (!t) return;
+  $("guide").hidden = true;
+  document.querySelectorAll('.nav[data-view="tools"]').forEach((b) => { b.parentElement.hidden = true; });
+  $("training-title").textContent = `Practice: ${t.title}`;
+  $("training-progress").textContent = `Event ${t.event_index} of ${t.events_total}`;
+  $("training-goals").textContent = t.goals ? `Goals: ${t.goals}` : "";
+  $("training-next").disabled = t.event_index >= t.events_total;
+  $("training-next").textContent = t.event_index >= t.events_total ? "No more events" : "Next event";
+}
+document.addEventListener("DOMContentLoaded", () => {
+  $("training-next").addEventListener("click", async () => {
+    try { const r = await api("POST", "/api/training/next", {}); say(`Event ${r.event_index} of ${r.events_total} arrived.`); await refresh(); }
+    catch (e) { say(e.message); }
+  });
+  $("training-finish").addEventListener("click", async () => {
+    try { const r = await api("POST", "/api/training/finish", {}); location.href = r.home; } catch (e) { say(e.message); }
+  });
+  $("training-leave").addEventListener("click", async () => {
+    try { const r = await api("POST", "/api/training/leave", {}); location.href = r.home; } catch (e) { say(e.message); }
+  });
+});
