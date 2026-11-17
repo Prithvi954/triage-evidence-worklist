@@ -32,7 +32,19 @@
 </nav>
 <main id="main" class="page-main" tabindex="-1">
   <section data-panel="library" aria-labelledby="lib-h">
-    <h1 id="lib-h" tabindex="-1">Scenario library</h1>
+    <div class="welcome" id="welcome">
+      <h1 id="lib-h" tabindex="-1">Welcome, <span id="welcome-name"></span></h1>
+      <p>This is a practice hospital with made-up patients. Nothing you do here affects real people or other students.</p>
+      <ol>
+        <li><strong>Pick a training user</strong> below to explore the whole unit as a nurse, charge nurse or resident, or</li>
+        <li><strong>Start a scenario</strong> to be scored on your decisions, and</li>
+        <li><strong>Add your own patients and emergencies</strong>, during any practice (buttons at the top of the board) or in <em>My cases</em>.</li>
+      </ol>
+    </div>
+    <h2 id="persona-h">Training users</h2>
+    <p class="hint">Each opens your own private copy of the urgent care unit, with four patients, AI evidence, and a possible emergency on the way.</p>
+    <div id="personas" class="persona-grid" aria-labelledby="persona-h"></div>
+    <h2>Scored scenarios</h2>
     <p class="hint">Practice on made-up patients. Each scenario opens in your own private practice unit and is scored when you finish.</p>
     <div id="lib-cards" class="cards"></div>
   </section>

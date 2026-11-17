@@ -40,7 +40,7 @@ button.primary { background: var(--accent); border-color: var(--accent-d); color
 button.primary:hover { background: var(--accent-d); }
 button.danger { color: var(--bad-fg); border-color: var(--bad-line); }
 button.link { border: 0; background: none; color: var(--accent); min-height: 26px; padding: .1rem .3rem; text-decoration: underline; font-weight: 500; }
-select, textarea, input[type="text"], input[type="search"] { border: 1px solid var(--line); border-radius: var(--radius);
+select, textarea, input[type="text"], input[type="search"], input[type="email"], input[type="password"], input[type="number"] { border: 1px solid var(--line); border-radius: var(--radius);
   padding: .3rem .45rem; background: var(--surface); min-height: 32px; }
 textarea { width: 100%; min-height: 4.5rem; }
 fieldset { border: 1px solid var(--line); border-radius: var(--radius); margin: 0; padding: .5rem .8rem .8rem; }
@@ -338,3 +338,23 @@ body.page { min-height: 100vh; }
 .stat.bad .n { color: var(--bad-fg); }
 @media (max-width: 40rem) { .form-grid { grid-template-columns: 1fr; } }
 .stack-gap { display: grid; gap: .6rem; }
+
+/* sign-in / sign-up */
+.login-intro { margin: 0 0 .8rem; color: var(--muted, #475467); }
+.auth-tabs { display: flex; gap: .25rem; border-bottom: 2px solid #d0d5dd; margin-bottom: 1rem; }
+.auth-tabs [role=tab] { background: none; border: 0; border-bottom: 3px solid transparent; margin-bottom: -2px; padding: .55rem .9rem;
+  font-weight: 600; color: #475467; cursor: pointer; border-radius: 0; }
+.auth-tabs [role=tab][aria-selected=true] { color: #0b5cad; border-bottom-color: #0b5cad; }
+.linkish { background: none; border: 0; padding: 0; color: #0b5cad; text-decoration: underline; cursor: pointer; font: inherit; }
+.check-row { display: flex; gap: .5rem; align-items: flex-start; margin: .4rem 0; }
+.check-row input { margin-top: .25rem; }
+.code-input { font-size: 1.6rem; letter-spacing: .35em; max-width: 12rem; text-align: center; }
+/* personas on the learning hub */
+.persona-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .8rem; margin-bottom: 1.4rem; }
+.persona { background: #fff; border: 1px solid #d0d5dd; border-radius: 8px; padding: 1rem; display: flex; flex-direction: column; gap: .4rem; }
+.persona .p-av { width: 2.4rem; height: 2.4rem; border-radius: 50%; background: #0b5cad; color: #fff; display: grid; place-items: center; font-weight: 700; }
+.persona h3 { margin: 0; }
+.persona p { margin: 0; }
+.persona .btns { margin-top: auto; }
+.welcome { background: #eef4ff; border: 1px solid #b2ccff; border-radius: 8px; padding: .9rem 1rem; margin-bottom: 1rem; }
+.welcome ol { margin: .3rem 0 0 1.2rem; padding: 0; }

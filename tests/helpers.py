@@ -15,6 +15,7 @@ def make_app(mode="replay"):
     d = tempfile.mkdtemp(prefix="triage-test-")
     s = config.Settings()
     s.mode = mode
+    s.demo_login = True    # tests use the one-click training-user picker
     s.db_path = os.path.join(d, "t.db")
     s.log_path = os.path.join(d, "app.log")
     s.error_report_path = os.path.join(d, "errors.jsonl")

@@ -22,6 +22,16 @@ ROLES = {
     "admin": "Administrator",
 }
 USERNAME_RE = re.compile(r"^[a-z0-9._-]{3,40}$")
+EMAIL_RE = re.compile(r"^[a-z0-9._%+-]{1,64}@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$")
+PROGRAMS = {"nursing": "Nursing student", "medical": "Medical student", "resident": "Resident",
+            "nurse": "Nurse (practicing)", "other": "Learner"}
+CODE_MINUTES = 15
+CODE_ATTEMPTS = 5
+RESEND_SECONDS = 60
+
+
+def code_hash(email: str, code: str) -> str:
+    return hashlib.sha256(f"{email}:{code}".encode()).hexdigest()
 
 
 def hash_password(password: str) -> str:

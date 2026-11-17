@@ -101,13 +101,75 @@ async function showLogin() {
         el("p", { id: descId, class: "hint" }, USER_HELP[u.id] || "")));
     }
   }
+  authTab(location.hash === "#signup" ? "signup" : "signin", false);
   $("login-h").focus();
 }
+
+// ---------------------------------------------------------------- sign up + email activation
+let pendingEmail = "";
+function authTab(which, focus = true) {
+  const isUp = which === "signup";
+  $("pane-verify").hidden = true;
+  $("pane-signin").hidden = isUp; $("pane-signup").hidden = !isUp;
+  document.querySelector(".auth-tabs").hidden = false;
+  for (const [id, on] of [["tab-signin", !isUp], ["tab-signup", isUp]]) {
+    $(id).setAttribute("aria-selected", String(on)); $(id).tabIndex = on ? 0 : -1;
+  }
+  if (focus) $(isUp ? "signup-h" : "login-h").focus();
+}
+function showVerify(email, emailConfigured) {
+  pendingEmail = email;
+  $("pane-signin").hidden = true; $("pane-signup").hidden = true; $("pane-verify").hidden = false;
+  document.querySelector(".auth-tabs").hidden = true;
+  $("verify-email").textContent = email;
+  $("verify-dev").hidden = emailConfigured !== false;
+  $("verify-error").textContent = ""; $("verify-code").value = "";
+  $("verify-h").focus();
+}
+document.addEventListener("DOMContentLoaded", () => {
+  $("tab-signin").addEventListener("click", () => authTab("signin"));
+  $("tab-signup").addEventListener("click", () => authTab("signup"));
+  $("go-signup").addEventListener("click", () => authTab("signup"));
+  document.querySelector(".auth-tabs").addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+      const up = $("tab-signin").getAttribute("aria-selected") === "true";
+      authTab(up ? "signup" : "signin", false); $(up ? "tab-signup" : "tab-signin").focus();
+    }
+  });
+  $("signup-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const out = $("signup-error");
+    if ($("su-pass").value !== $("su-pass2").value) { out.textContent = "The two passwords don't match."; $("su-pass2").focus(); return; }
+    try {
+      const r = await api("POST", "/api/signup", { name: $("su-name").value, email: $("su-email").value,
+        program: $("su-program").value, password: $("su-pass").value });
+      let cfg = {}; try { cfg = await (await fetch("/api/config")).json(); } catch (_) { /* ignore */ }
+      showVerify(r.email, cfg.email_configured);
+    } catch (err) {
+      out.textContent = err.message === "bad_request" ? "Please check the form and try again." : err.message;
+    }
+  });
+  $("verify-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const r = await api("POST", "/api/signup/verify", { email: pendingEmail, code: $("verify-code").value });
+      location.href = r.home || "/";
+    } catch (err) { $("verify-error").textContent = err.message; $("verify-code").focus(); }
+  });
+  $("verify-resend").addEventListener("click", async () => {
+    try { await api("POST", "/api/signup/resend", { email: pendingEmail }); $("verify-error").textContent = "A new code is on its way."; }
+    catch (err) { $("verify-error").textContent = err.message === "not_found" ? "Please sign up again." : err.message; }
+  });
+  $("verify-back").addEventListener("click", () => authTab("signup"));
+});
 
 async function login(creds) {
   let r;
   try { r = await api("POST", "/api/login", creds); }
-  catch (e) { $("login-error").textContent = e.message === "forbidden" ? "Sign-in failed." : e.message; $("login-pass").focus(); return; }
+  catch (e) {
+    if (e.message.startsWith("Please activate")) { showVerify(String(creds.username || "").trim().toLowerCase()); $("verify-error").textContent = e.message; return; }
+    $("login-error").textContent = e.message === "forbidden" ? "Sign-in failed." : e.message; $("login-pass").focus(); return;
+  }
   if (r.home && r.home !== "/") { location.href = r.home; return; }
   $("login").hidden = true; $("app").hidden = false;
   await refresh();
@@ -1273,5 +1335,64 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   $("training-leave").addEventListener("click", async () => {
     try { const r = await api("POST", "/api/training/leave", {}); location.href = r.home; } catch (e) { say(e.message); }
+  });
+});
+
+// ---------------------------------------------------------------- add your own practice patients / notes
+const NOTE_TEMPLATES = [
+  ["Routine update", "Nursing note. Patient reports demo signal B, unchanged. Resting comfortably."],
+  ["New symptom", "Nursing note. Patient now reports demo signal A that started 20 minutes ago."],
+  ["Possible emergency", "Nursing note. Patient reports demo red flag R right now. Skin pale and clammy."],
+  ["Tricky: family history", "Nursing note. Patient denies demo red flag R. Patient's father had demo red flag R years ago."],
+  ["Tricky: in the past", "Late entry. Demo red flag S resolved last month and has not come back."],
+];
+function practiceModal(title, fields, onSubmit) {
+  const prev = document.activeElement;
+  const err = el("p", { class: "form-result", role: "alert" });
+  const close = () => { back.remove(); if (prev && prev.focus) prev.focus(); };
+  const form = el("form", { class: "modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "pm-h",
+    onsubmit: async (e) => { e.preventDefault(); try { await onSubmit(); close(); await refresh(); } catch (x) { err.textContent = x.message; } } },
+    el("h2", { id: "pm-h" }, title), ...fields,
+    el("p", { class: "hint" }, "Use only made-up details. Notes you add here stay in your practice unit and aren't sent to the AI."),
+    el("div", { class: "btns" }, el("button", { type: "submit", class: "primary" }, "Add"), el("button", { type: "button", onclick: close }, "Cancel")), err);
+  form.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+  const back = el("div", { class: "modal-back" }, form);
+  document.body.append(back);
+  form.querySelector("input, select, textarea").focus();
+}
+function templateButtons(ta) {
+  return el("div", { class: "btns", role: "group", "aria-label": "Fill in an example note" },
+    ...NOTE_TEMPLATES.map(([name, text]) => el("button", { type: "button", onclick: () => { ta.value = text; ta.focus(); } }, name)));
+}
+document.addEventListener("DOMContentLoaded", () => {
+  $("training-add-patient").addEventListener("click", () => {
+    const used = new Set((S.queue || []).map((q) => q.label));
+    let letter = "H"; while (used.has(`Patient ${letter}`) && letter < "Z") letter = String.fromCharCode(letter.charCodeAt(0) + 1);
+    const f = { label: el("input", { id: "ap-label", type: "text", value: `Patient ${letter}`, maxlength: 20, required: true }),
+      age: el("input", { id: "ap-age", type: "number", min: 0, max: 120, value: 50 }),
+      sex: el("select", { id: "ap-sex" }, ...["F", "M", "X"].map((x) => el("option", { value: x }, x))),
+      complaint: el("input", { id: "ap-complaint", type: "text", value: "Demo concern X", maxlength: 60 }),
+      location: el("input", { id: "ap-location", type: "text", value: "Lobby", maxlength: 30 }),
+      note: el("textarea", { id: "ap-note", rows: 3, maxlength: 1500 }) };
+    practiceModal("Add a practice patient", [
+      el("label", { for: "ap-label" }, "Label (made up)"), f.label, el("label", { for: "ap-age" }, "Age"), f.age,
+      el("label", { for: "ap-sex" }, "Sex"), f.sex, el("label", { for: "ap-complaint" }, "Chief complaint"), f.complaint,
+      el("label", { for: "ap-location" }, "Location"), f.location,
+      el("label", { for: "ap-note" }, "First note (optional)"), templateButtons(f.note), f.note],
+    async () => {
+      await api("POST", "/api/training/add-patient", { label: f.label.value, age: f.age.value, sex: f.sex.value,
+        complaint: f.complaint.value, location: f.location.value, note: f.note.value });
+      say(`${f.label.value} added to the board.`);
+    });
+  });
+  $("training-add-note").addEventListener("click", () => {
+    const pick = el("select", { id: "an-patient" }, ...(S.queue || []).map((q) => el("option", { value: q.encounter_id }, q.label)));
+    const ta = el("textarea", { id: "an-text", rows: 4, maxlength: 1500, required: true });
+    practiceModal("Add a note or emergency", [el("label", { for: "an-patient" }, "Patient"), pick,
+      el("label", { for: "an-text" }, "Note text"), templateButtons(ta), ta],
+    async () => {
+      await api("POST", "/api/training/add-note", { encounter_id: pick.value, text: ta.value });
+      say("Note added. Check Notes to review and Emergencies.");
+    });
   });
 });

@@ -105,6 +105,10 @@ CREATE TABLE IF NOT EXISTS training_sessions (
 -- integration: last sync per FHIR source
 CREATE TABLE IF NOT EXISTS fhir_sync (source TEXT PRIMARY KEY, org TEXT NOT NULL, last_sync_at TEXT, last_error TEXT,
   encounters INTEGER NOT NULL DEFAULT 0, notes INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS training_roles (session_id TEXT PRIMARY KEY, role TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS signups (email TEXT PRIMARY KEY, name TEXT NOT NULL, program TEXT NOT NULL,
+  password_hash TEXT NOT NULL, code_hash TEXT NOT NULL, expires_at REAL NOT NULL, attempts INTEGER NOT NULL DEFAULT 0,
+  last_sent_at REAL NOT NULL, created_at REAL NOT NULL);
 """
 
 # Columns added after the first release. Applied idempotently to existing databases.

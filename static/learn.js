@@ -262,6 +262,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     } catch (err) { out.textContent = err.message; }
     out.focus();
   });
+  $("welcome-name").textContent = ME.name.split(" ")[0];
+  loadPersonas();
   const m = location.hash.match(/result=([A-Za-z0-9_-]+)/);
   if (m) { showTab("results", false); showResult(m[1]); } else showTab("library");
 });
+
+async function loadPersonas() {
+  const list = await api("GET", "/api/learn/personas");
+  $("personas").replaceChildren(...list.map((p) => el("article", { class: "persona", "aria-labelledby": `pz-${p.id}` },
+    el("span", { class: "p-av", "aria-hidden": "true" }, p.name.replace("Dr. ", "")[0]),
+    el("h3", { id: `pz-${p.id}` }, `${p.name}`),
+    el("p", { class: "sc-meta" }, p.who),
+    el("p", {}, p.does),
+    el("div", { class: "btns" }, el("button", { type: "button", class: "primary", onclick: async () => {
+      say(`Opening the practice unit as ${p.name}…`);
+      try { const r = await api("POST", `/api/learn/personas/${p.id}/start`, {}); location.href = r.home || "/"; }
+      catch (e) { say(e.message); }
+    } }, `Practice as ${p.name}`)))));
+}

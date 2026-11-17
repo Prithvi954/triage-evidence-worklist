@@ -35,7 +35,7 @@ class Settings:
     # "clinical" (real data: requires an encryption key; AI on real notes only with a confirmed BAA).
     deployment: str = field(default_factory=lambda: os.environ.get("TRIAGE_DEPLOYMENT", "demo"))
     # Show the one-click training-user picker on the sign-in page (never in clinical deployments).
-    demo_login: bool = field(default_factory=lambda: os.environ.get("TRIAGE_DEMO_LOGIN", "1") == "1")
+    demo_login: bool = field(default_factory=lambda: os.environ.get("TRIAGE_DEMO_LOGIN", "0") == "1")
     # The facility has an executed BAA with Anthropic and a HIPAA-ready organization for this API key.
     baa_confirmed: bool = field(default_factory=lambda: os.environ.get("TRIAGE_BAA_CONFIRMED", "0") == "1")
     session_idle_minutes: int = field(default_factory=lambda: int(os.environ.get("TRIAGE_SESSION_IDLE_MIN", "30")))
@@ -47,6 +47,14 @@ class Settings:
     fhir_base_url: str = field(default_factory=lambda: os.environ.get("TRIAGE_FHIR_BASE_URL", ""))
     fhir_token: str = field(default_factory=lambda: os.environ.get("TRIAGE_FHIR_TOKEN", ""))
     fhir_org: str = field(default_factory=lambda: os.environ.get("TRIAGE_FHIR_ORG", "org_n"))
+    # Public sign-up for learners (email + activation code). New accounts join the open class as students.
+    signup_open: bool = field(default_factory=lambda: os.environ.get("TRIAGE_SIGNUP", "1") == "1")
+    signup_org: str = field(default_factory=lambda: os.environ.get("TRIAGE_SIGNUP_ORG", "org_school"))
+    smtp_host: str = field(default_factory=lambda: os.environ.get("TRIAGE_SMTP_HOST", ""))
+    smtp_port: str = field(default_factory=lambda: os.environ.get("TRIAGE_SMTP_PORT", "587"))
+    smtp_user: str = field(default_factory=lambda: os.environ.get("TRIAGE_SMTP_USER", ""))
+    smtp_password: str = field(default_factory=lambda: os.environ.get("TRIAGE_SMTP_PASSWORD", ""))
+    smtp_from: str = field(default_factory=lambda: os.environ.get("TRIAGE_SMTP_FROM", ""))
 
     def ai_may_send_real_notes(self) -> bool:
         """Real (non-synthetic) note text may go to the AI only in a clinical deployment with a BAA."""

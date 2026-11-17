@@ -22,3 +22,18 @@ services:
         value: "1"
       - key: ANTHROPIC_API_KEY
         sync: false
+      - key: TRIAGE_DEMO_LOGIN        # sign-in page shows only Sign in / Create account
+        value: "0"
+      - key: TRIAGE_SIGNUP
+        value: "1"
+      # Email for activation codes. Fill these in on Render (Environment tab); never in code.
+      - key: TRIAGE_SMTP_HOST
+        sync: false
+      - key: TRIAGE_SMTP_PORT
+        value: "587"
+      - key: TRIAGE_SMTP_USER
+        sync: false
+      - key: TRIAGE_SMTP_PASSWORD
+        sync: false
+      - key: TRIAGE_SMTP_FROM
+        sync: false

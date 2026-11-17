@@ -27,15 +27,66 @@
       </div>
     </div>
     <div class="login-body">
-      <h1 id="login-h" tabindex="-1">Sign in</h1>
-      <form id="login-form" class="login-form">
-        <label for="login-user">Username</label>
-        <input id="login-user" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
-        <label for="login-pass">Password</label>
-        <input id="login-pass" type="password" autocomplete="current-password" required>
-        <button type="submit" class="primary">Sign in</button>
-        <p id="login-error" class="form-result" role="alert"></p>
-      </form>
+      <p class="login-intro">Practice triage on made-up patients. For nursing students, medical students and residents.</p>
+      <div class="auth-tabs" role="tablist" aria-label="Sign in or create an account">
+        <button type="button" role="tab" id="tab-signin" aria-selected="true" aria-controls="pane-signin">Sign in</button>
+        <button type="button" role="tab" id="tab-signup" aria-selected="false" aria-controls="pane-signup" tabindex="-1">Create account</button>
+      </div>
+
+      <div id="pane-signin" role="tabpanel" aria-labelledby="tab-signin">
+        <h1 id="login-h" tabindex="-1">Sign in</h1>
+        <form id="login-form" class="login-form">
+          <label for="login-user">Email (or username)</label>
+          <input id="login-user" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+          <label for="login-pass">Password</label>
+          <input id="login-pass" type="password" autocomplete="current-password" required>
+          <button type="submit" class="primary">Sign in</button>
+          <p id="login-error" class="form-result" role="alert"></p>
+        </form>
+        <p class="hint">New here? <button type="button" class="linkish" id="go-signup">Create a free account</button></p>
+      </div>
+
+      <div id="pane-signup" role="tabpanel" aria-labelledby="tab-signup" hidden>
+        <h1 id="signup-h" tabindex="-1">Create your account</h1>
+        <form id="signup-form" class="login-form">
+          <label for="su-name">Your name</label>
+          <input id="su-name" type="text" autocomplete="name" required maxlength="60">
+          <label for="su-email">Email</label>
+          <input id="su-email" type="email" autocomplete="email" autocapitalize="none" spellcheck="false" required>
+          <label for="su-program">I am a…</label>
+          <select id="su-program" required>
+            <option value="nursing">Nursing student</option>
+            <option value="medical">Medical student</option>
+            <option value="resident">Resident</option>
+            <option value="nurse">Practicing nurse</option>
+            <option value="other">Other learner</option>
+          </select>
+          <label for="su-pass">Password</label>
+          <input id="su-pass" type="password" autocomplete="new-password" required aria-describedby="su-pass-hint">
+          <p id="su-pass-hint" class="hint">At least 10 characters, with letters and numbers.</p>
+          <label for="su-pass2">Confirm password</label>
+          <input id="su-pass2" type="password" autocomplete="new-password" required>
+          <p class="check-row"><input type="checkbox" id="su-agree" required>
+            <label for="su-agree">I understand this is practice only, and I will never enter real patient information.</label></p>
+          <button type="submit" class="primary">Create account</button>
+          <p id="signup-error" class="form-result" role="alert"></p>
+        </form>
+      </div>
+
+      <div id="pane-verify" hidden>
+        <h1 id="verify-h" tabindex="-1">Check your email</h1>
+        <p>We sent a 6-digit activation code to <strong id="verify-email"></strong>. It expires in 15 minutes.</p>
+        <p id="verify-dev" class="hint" hidden>Email isn't set up on this server yet, so the code was printed in the server's console.</p>
+        <form id="verify-form" class="login-form">
+          <label for="verify-code">Activation code</label>
+          <input id="verify-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9 ]{6,7}" maxlength="7" required class="code-input">
+          <button type="submit" class="primary">Activate and sign in</button>
+          <p id="verify-error" class="form-result" role="alert"></p>
+        </form>
+        <p class="btns"><button type="button" id="verify-resend">Send a new code</button>
+          <button type="button" id="verify-back">Use a different email</button></p>
+      </div>
+
       <div id="demo-users" hidden>
         <h2 class="demo-h">Training users</h2>
         <p class="hint">One-click sign-in for practice. Password for typed sign-in: <strong>demo</strong>.</p>
@@ -137,6 +188,8 @@
       <span id="training-progress"></span>
       <span id="training-goals" class="small"></span>
       <div class="btns">
+        <button type="button" id="training-add-patient">Add a patient</button>
+        <button type="button" id="training-add-note">Add a note or emergency</button>
         <button type="button" id="training-next">Next event</button>
         <button type="button" id="training-finish">Finish and see my score</button>
         <button type="button" id="training-leave">Leave practice</button>

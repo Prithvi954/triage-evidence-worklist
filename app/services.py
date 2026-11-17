@@ -147,9 +147,100 @@ class Service:
         if not u or not u["password_hash"] or not accounts.verify_password(password or "", u["password_hash"]):
             self.throttle.fail(username)
             log_event(iso(self.clock.now()), "auth.login_failed")
-            raise Forbidden("Wrong username or password.")
+            if not u and self.pending_signup(username):
+                raise Forbidden("Please activate your account first with the code we emailed you.")
+            raise Forbidden("Wrong email or password.")
         self.throttle.clear(username)
         return self._new_session(u), u
+
+    # ---------------------------------------------------------------- public sign-up (learners)
+    signup_throttle = accounts.Throttle(limit=10, window_s=3600)   # per client address
+
+    def signup(self, email, name, program, password, client="?"):
+        from . import mailer
+        if not self.s.signup_open:
+            raise Forbidden("Sign-up is closed on this server. Ask your instructor for an account.")
+        if self.signup_throttle.blocked(client):
+            raise Forbidden("Too many sign-ups from this network. Try again in an hour.")
+        email = (email or "").strip().lower()[:120]
+        name = " ".join((name or "").split())[:60]
+        if not accounts.EMAIL_RE.match(email):
+            raise BadInput("Please enter a valid email address.")
+        if len(name) < 2:
+            raise BadInput("Please enter your name.")
+        if program not in accounts.PROGRAMS:
+            raise BadInput("Please choose your program.")
+        problems = accounts.password_problems(password or "")
+        if problems:
+            raise BadInput("Please use a password with " + " and ".join(problems) + ".")
+        if self.db.one("SELECT 1 FROM users WHERE username=?", (email,)):
+            raise Conflict("An account with this email already exists. Please sign in.")
+        now = time.time()
+        with self.db.tx() as c:
+            c.execute("DELETE FROM signups WHERE created_at < ?", (now - 86400,))
+        prev = self.db.one("SELECT * FROM signups WHERE email=?", (email,))
+        if prev and now - prev["last_sent_at"] < accounts.RESEND_SECONDS:
+            raise Conflict("We just sent a code to this email. Wait a minute before asking for another.")
+        self.signup_throttle.fail(client)
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        with self.db.tx() as c:
+            c.execute("INSERT OR REPLACE INTO signups VALUES (?,?,?,?,?,?,?,?,?)",
+                      (email, name, program, accounts.hash_password(password), accounts.code_hash(email, code),
+                       now + accounts.CODE_MINUTES * 60, 0, now, prev["created_at"] if prev else now))
+        mailer.send_code(self.s, email, name, code, accounts.CODE_MINUTES)
+        log_event(iso(self.clock.now()), "auth.signup_code_sent")
+        return {"ok": True, "email": email, "minutes": accounts.CODE_MINUTES}
+
+    def resend_code(self, email, client="?"):
+        from . import mailer
+        email = (email or "").strip().lower()
+        row = self.db.one("SELECT * FROM signups WHERE email=?", (email,))
+        if not row:
+            raise NotFound()
+        now = time.time()
+        if now - row["last_sent_at"] < accounts.RESEND_SECONDS:
+            raise Conflict(f"Please wait {int(accounts.RESEND_SECONDS - (now - row['last_sent_at'])) + 1} seconds before asking for a new code.")
+        if self.signup_throttle.blocked(client):
+            raise Forbidden("Too many requests from this network. Try again in an hour.")
+        self.signup_throttle.fail(client)
+        code = f"{secrets.randbelow(1_000_000):06d}"
+        with self.db.tx() as c:
+            c.execute("UPDATE signups SET code_hash=?, expires_at=?, attempts=0, last_sent_at=? WHERE email=?",
+                      (accounts.code_hash(email, code), now + accounts.CODE_MINUTES * 60, now, email))
+        mailer.send_code(self.s, email, row["name"], code, accounts.CODE_MINUTES)
+        return {"ok": True}
+
+    def verify_signup(self, email, code):
+        import hmac
+        email = (email or "").strip().lower()
+        code = "".join(ch for ch in str(code or "") if ch.isdigit())
+        row = self.db.one("SELECT * FROM signups WHERE email=?", (email,))
+        if not row:
+            raise BadInput("We couldn't find a sign-up for this email. Please sign up again.")
+        if row["attempts"] >= accounts.CODE_ATTEMPTS:
+            raise Forbidden("Too many wrong codes. Ask for a new code.")
+        if time.time() > row["expires_at"]:
+            raise BadInput("This code has expired. Ask for a new code.")
+        if not hmac.compare_digest(accounts.code_hash(email, code), row["code_hash"]):
+            with self.db.tx() as c:
+                c.execute("UPDATE signups SET attempts=attempts+1 WHERE email=?", (email,))
+            left = accounts.CODE_ATTEMPTS - row["attempts"] - 1
+            raise BadInput(f"That code isn't right. {left} {'try' if left == 1 else 'tries'} left." if left else
+                           "That code isn't right. Ask for a new code.")
+        if self.db.one("SELECT 1 FROM users WHERE username=?", (email,)):
+            raise Conflict("An account with this email already exists. Please sign in.")
+        uid = _id("u")
+        org = self.s.signup_org
+        with self.db.tx() as c:
+            c.execute("INSERT INTO users (id, org, name, role, title, status, username, password_hash) VALUES (?,?,?,?,?,?,?,?)",
+                      (uid, org, row["name"], "student", accounts.PROGRAMS[row["program"]], "on_shift", email, row["password_hash"]))
+            c.execute("DELETE FROM signups WHERE email=?", (email,))
+            audit(c, iso(self.clock.now()), org, uid, "account_activated", "user", uid)
+        u = self.db.one("SELECT * FROM users WHERE id=?", (uid,))
+        return self._new_session(u), u
+
+    def pending_signup(self, email):
+        return bool(self.db.one("SELECT 1 FROM signups WHERE email=?", ((email or "").strip().lower(),)))
 
     def user_for_token(self, token):
         if not token:

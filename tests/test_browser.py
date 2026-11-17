@@ -254,7 +254,7 @@ class TestBrowserFocus(unittest.TestCase):
         page.goto(self.base + "/")
         page.get_by_role("button", name="Sign in as Taylor").click()
         page.wait_for_url("**/learn.html")
-        page.get_by_role("heading", name="Scenario library").wait_for()
+        page.get_by_role("heading", name="Welcome, Taylor").wait_for()
         page.get_by_role("button", name="Start practice: The changing story").click()
         page.wait_for_function("location.pathname === '/' && !document.getElementById('training-bar').hidden", timeout=10000)
         self.assertIn("Event 1 of 4", page.locator("#training-bar").inner_text())
@@ -291,6 +291,52 @@ class TestBrowserFocus(unittest.TestCase):
         page.get_by_role("button", name="Results").click()
         page.wait_for_function("document.getElementById('res-body').innerText.includes('Taylor')")
         ctx.close()
+
+    def test_signup_with_email_code_then_training_users_and_add_patient(self):
+        import re
+        from app import mailer
+        self.app.svc.signup_throttle.fails.clear()
+        mailer.sent.clear()
+        ctx = self.browser.new_context(bypass_csp=True)
+        page = ctx.new_page()
+        page.goto(self.base + "/")
+        page.get_by_role("tab", name="Create account").click()
+        page.get_by_label("Your name").fill("Jamie Rivera")
+        page.get_by_label("Email", exact=True).fill("jamie@example.edu")
+        page.get_by_label("I am a…").select_option("medical")
+        page.locator("#su-pass").fill("practice123")
+        page.get_by_label("Confirm password").fill("practice123")
+        page.get_by_label("I understand this is practice only").check()
+        page.get_by_role("button", name="Create account").click()
+        page.get_by_role("heading", name="Check your email").wait_for()
+        code = re.search(r"\b(\d{6})\b", mailer.sent[-1][2]).group(1)
+        page.get_by_label("Activation code").fill(code)
+        page.get_by_role("button", name="Activate and sign in").click()
+        page.wait_for_url("**/learn.html")
+        page.get_by_role("heading", name="Welcome, Jamie").wait_for()
+        self.assertIn("Medical student", page.locator("#s-user").inner_text())
+        page.get_by_role("button", name="Practice as Sam").click()
+        page.wait_for_function("location.pathname === '/' && !document.getElementById('training-bar').hidden", timeout=10000)
+        page.get_by_role("button", name="Add a patient").click()
+        page.get_by_role("button", name="Possible emergency").click()
+        page.get_by_role("button", name="Add", exact=True).click()
+        page.wait_for_function("document.getElementById('queue').innerText.includes('Patient H')", timeout=10000)
+        ctx.close()
+        # signing in again uses email + password; the sign-in page has no training-user list
+        ctx = self.browser.new_context(bypass_csp=True)
+        page = ctx.new_page()
+        self.app.settings.demo_login = False
+        try:
+            page.goto(self.base + "/")
+            page.get_by_role("heading", name="Sign in").wait_for()
+            self.assertTrue(page.locator("#demo-users").is_hidden())
+            page.locator("#login-user").fill("jamie@example.edu")
+            page.locator("#login-pass").fill("practice123")
+            page.get_by_role("button", name="Sign in", exact=True).click()
+            page.wait_for_url("**/learn.html")
+        finally:
+            self.app.settings.demo_login = True
+            ctx.close()
 
     def test_access_revoked_clears_patient_content(self):
         page = self.signin("Jordan, RN (demo)")

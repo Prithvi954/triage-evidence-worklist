@@ -52,7 +52,11 @@ More settings: `TRIAGE_DEPLOYMENT` (`demo`|`education`|`clinical`), `TRIAGE_DEMO
 | **Demo** (default) | Anyone | The full worklist with synthetic patients and one-click demo sign-in |
 | **Clinical** (future, with a hospital partner) | Nurses, charge nurses, providers | Real accounts only, encryption required, read-only **FHIR R4** EHR connector, real notes sent to AI only with a confirmed BAA |
 
-Demo sign-ins (password `demo`): **riley** (RN), **sam** (charge RN), **jordan** (RN, other unit), **drlee** (provider), **alex** (admin), **taylor** (nursing student), **avery** (medical student), **morgan** (instructor).
+**Sign up:** anyone can create a free learner account (**Create account** on the sign-in page). We email a 6-digit activation code; the account works after the code is entered (codes expire in 15 minutes, 5 tries, new code after 60 seconds, 10 sign-ups per network per hour). After signing in, learners see the **training users** (practice as Riley the staff nurse, Sam the charge nurse, or Dr. Lee the resident, each in a private copy of the unit), the scored scenarios, and **Add a patient / Add a note or emergency** buttons during any practice.
+
+**Email setup:** set `TRIAGE_SMTP_HOST`, `TRIAGE_SMTP_PORT` (587), `TRIAGE_SMTP_USER`, `TRIAGE_SMTP_PASSWORD`, `TRIAGE_SMTP_FROM`. Any provider works (Gmail with an app password, Brevo, Resend, SendGrid, Mailgun). Without them, codes are printed in the server console, which is only useful for local testing. `TRIAGE_SIGNUP=0` turns public sign-up off.
+
+Seeded accounts (password `demo`, sign in by username): **riley** (RN), **sam** (charge RN), **jordan** (RN, other unit), **drlee** (provider), **alex** (admin), **taylor** (nursing student), **avery** (medical student), **morgan** (instructor).
 
 **Practice in 4 steps (students):** sign in as Taylor → **Start practice** on a scenario → work the board, pressing **Next event** to receive new notes → **Finish and see my score**. Build your own case under **My cases**, practice it, then **Submit to class**; an instructor (Morgan) approves it into the class library. The case builder blocks things that look like real patient information, and student cases are sent to the AI only after approval.
 

@@ -197,8 +197,30 @@ def make_handler(app: App):
                     if self.headers.get("X-Requested-With") != "triage-ui":   # CSRF: custom header + SameSite=Strict
                         return self._err(403, "forbidden")
                 if path == "/api/config" and method == "GET":   # public, no secrets
+                    from . import mailer
                     return self._json(200, {"deployment": app.settings.deployment, "demo_login": app.settings.demo_login,
-                                            "lock_minutes": app.settings.lock_minutes})
+                                            "lock_minutes": app.settings.lock_minutes, "signup": app.settings.signup_open,
+                                            "email_configured": mailer.configured(app.settings)})
+                if path.startswith("/api/signup") and method == "POST":
+                    b = self._body()
+                    client = (self.headers.get("X-Forwarded-For") or self.client_address[0]).split(",")[0].strip()
+                    if path == "/api/signup":
+                        try:
+                            r = svc.signup(str(b.get("email", "")), str(b.get("name", "")), str(b.get("program", "")),
+                                           str(b.get("password", ""))[:200], client)
+                        except OSError:
+                            raise BadInput("We couldn't send the email right now. Please try again in a few minutes.")
+                        return self._json(200, r)
+                    if path == "/api/signup/resend":
+                        try:
+                            return self._json(200, svc.resend_code(str(b.get("email", "")), client))
+                        except OSError:
+                            raise BadInput("We couldn't send the email right now. Please try again in a few minutes.")
+                    if path == "/api/signup/verify":
+                        tok, u = svc.verify_signup(str(b.get("email", "")), str(b.get("code", ""))[:20])
+                        return self._json(200, {"ok": True, "role": u["role"], "home": _home_for(u["role"])},
+                                          extra={"Set-Cookie": self._cookie(tok)})
+                    return self._err(404, "not_found")
                 if path == "/api/demo-users" and method == "GET":
                     if not app.settings.demo_login:
                         return self._json(200, [])
@@ -327,6 +349,13 @@ def make_handler(app: App):
                 return self._json(200, svc.obligation_action(user, p[1], p[2]))
             # ---- education: scenario library, case builder, training sessions, results
             edu = app.education
+            if p == ["learn", "personas"] and m == "GET":
+                return self._json(200, edu.personas())
+            if len(p) == 4 and p[:2] == ["learn", "personas"] and p[3] == "start" and m == "POST":
+                ck = cookies.SimpleCookie(self.headers.get("Cookie", ""))
+                r = edu.start_persona(user, p[2], ck["sid"].value if "sid" in ck else "")
+                return self._json(200, {"ok": True, "session_id": r["session_id"], "home": "/"},
+                                  extra={"Set-Cookie": self._cookie(r["token"])})
             if p and p[0] == "learn":
                 if m == "GET" and p == ["learn", "scenarios"]:
                     return self._json(200, edu.list_scenarios(user))
@@ -356,6 +385,11 @@ def make_handler(app: App):
                     return self._json(200, edu.session_result(user, p[2]))
                 raise NotFound()
             if p and p[0] == "training" and m == "POST":
+                if p == ["training", "add-patient"]:
+                    return self._json(200, edu.add_patient(user, self._body()))
+                if p == ["training", "add-note"]:
+                    b = self._body()
+                    return self._json(200, edu.add_note(user, str(b.get("encounter_id", "")), b.get("text", "")))
                 if p == ["training", "next"]:
                     return self._json(200, edu.next_event(user))
                 if p in (["training", "finish"], ["training", "leave"]):
@@ -504,6 +538,8 @@ def check_deployment(settings):
             problems.append("TRIAGE_DATA_KEY must be set (notes are encrypted at rest).")
         if settings.demo_login:
             problems.append("TRIAGE_DEMO_LOGIN must be 0 (no one-click sign-in).")
+        if settings.signup_open:
+            problems.append("TRIAGE_SIGNUP must be 0 (no public sign-up on a clinical server).")
         if settings.demo_controls:
             problems.append("TRIAGE_DEMO_CONTROLS must be 0 (no simulator).")
         if not settings.secure_cookies:

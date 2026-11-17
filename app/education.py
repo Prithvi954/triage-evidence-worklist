@@ -322,9 +322,30 @@ class Education:
         return {"ok": True}
 
     # ------------------------------------------------------------------ sandbox sessions
-    def start_session(self, user, sid, parent_token):
+    PERSONAS = {
+        "riley": {"name": "Riley", "role": "rn", "who": "Staff nurse",
+                  "does": "Reviews new notes, checks the AI's evidence against the note, checks emergency flags and escalates."},
+        "sam": {"name": "Sam", "role": "charge_rn", "who": "Charge nurse",
+                "does": "Everything Riley does, plus confirms priority changes and makes the final emergency call."},
+        "drlee": {"name": "Dr. Lee", "role": "provider", "who": "Resident / provider",
+                  "does": "Reviews evidence, confirms priority and emergencies, and writes notes in the chart."},
+    }
+
+    def personas(self):
+        return [dict(id=k, **v) for k, v in self.PERSONAS.items()]
+
+    def start_persona(self, user, persona, parent_token):
+        """Explore the whole demo unit as one of the training users, in a private copy."""
+        if persona not in self.PERSONAS:
+            raise NotFound()
+        return self.start_session(user, "sc_builtin_story", parent_token, persona=persona)
+
+    def start_session(self, user, sid, parent_token, persona=None):
         self._learner(user)
-        r = self._scenario(user, sid)
+        r = dict(self._scenario(user, sid))
+        if persona:
+            pz = self.PERSONAS[persona]
+            r["role"] = pz["role"]
         spec = json.loads(r["spec_json"])
         hexid = secrets.token_hex(5)
         org, shadow, tid = f"trn_{hexid}", f"trn_u_{hexid}", f"ts_{hexid}"
@@ -334,8 +355,10 @@ class Education:
         with self.db.tx() as c:
             c.execute("INSERT INTO orgs VALUES (?,?)", (org, f"Practice: {r['title']}"))
             c.execute("INSERT INTO feed (org, last_message_at) VALUES (?,?)", (org, now))
+            title = (f"Practicing as {self.PERSONAS[persona]['name']} · {ROLE_CHOICES[r['role']]}" if persona
+                     else f"Trainee · {ROLE_CHOICES[r['role']]}")
             c.execute("INSERT INTO users (id, org, name, role, title, status) VALUES (?,?,?,?,?,?)",
-                      (shadow, org, user["name"], r["role"], f"Trainee · {ROLE_CHOICES[r['role']]}", "on_shift"))
+                      (shadow, org, user["name"], r["role"], title, "on_shift"))
             if r["role"] != "charge_rn":
                 c.execute("INSERT INTO users (id, org, name, role, title, status) VALUES (?,?,?,?,?,?)",
                           (f"trn_c_{hexid}", org, "Sim charge nurse", "charge_rn", "Simulated charge nurse", "on_shift"))
@@ -366,6 +389,7 @@ class Education:
                               "reviewed_by, reviewed_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                               (f"ri_{secrets.token_hex(5)}", org, f"{org}_{n['patient']}", nid, 1, signed, "reviewed",
                                "not_run_seeded", shadow, signed))
+            c.execute("INSERT OR IGNORE INTO training_roles VALUES (?,?)", (tid, r["role"]))
             c.execute("INSERT INTO training_sessions (id, scenario_id, user_id, home_org, sandbox_org, shadow_user, parent_token, "
                       "started_at, event_index, events_total) VALUES (?,?,?,?,?,?,?,?,?,?)",
                       (tid, sid, user["id"], user["org"], org, shadow, parent_token or "", now, 0, events_total))
@@ -433,7 +457,8 @@ class Education:
         org, shadow = t["sandbox_org"], t["shadow_user"]
         sc = self.db.one("SELECT * FROM scenarios WHERE id=?", (t["scenario_id"],))
         spec = json.loads(sc["spec_json"])
-        role = sc["role"]
+        tr = self.db.one("SELECT role FROM training_roles WHERE session_id=?", (t["id"],))
+        role = tr["role"] if tr else sc["role"]
         items = []
 
         def add(area, patient, points, maximum, outcome, feedback):
@@ -560,3 +585,68 @@ class Education:
                 "decisions": [{"at": d["decided_at"], "patient": d["label"], "decision": d["decision"],
                                "corrected": sorted({k for v in json.loads(d["corrections_json"] or "{}").values() for k in v}),
                                "comment": d["comment"]} for d in decisions]}
+
+
+    # ------------------------------------------------------------------ add your own during practice
+    def add_patient(self, user, payload):
+        t = self._session_for_shadow(user)
+        if t["finished_at"]:
+            raise Conflict("This practice session is finished.")
+        org = t["sandbox_org"]
+        if self.db.one("SELECT COUNT(*) n FROM encounters WHERE org=?", (org,))["n"] >= 16:
+            raise BadInput("This practice unit is full (16 patients).")
+        label = " ".join(str(payload.get("label") or "").split())
+        if not LABEL_RE.match(label):
+            raise BadInput("Please use a made-up label like “Patient H” or “Bed 4”, not a real name.")
+        if self.db.one("SELECT 1 FROM encounters WHERE org=? AND label=?", (org, label)):
+            raise BadInput("There's already a patient with that label. Pick another.")
+        try:
+            age = int(payload["age"]) if str(payload.get("age") or "").strip() else None
+        except ValueError:
+            raise BadInput("Age must be a number.")
+        if age is not None and not 0 <= age <= 120:
+            raise BadInput("Age must be between 0 and 120.")
+        sex = str(payload.get("sex") or "")[:1].upper() or None
+        complaint = str(payload.get("complaint") or "").strip()[:60]
+        location = str(payload.get("location") or "").strip()[:30] or "Lobby"
+        note = str(payload.get("note") or "").strip()[:LIMITS["text"]]
+        problems = phi_problems([complaint, location, note])
+        if problems:
+            raise BadInput("This looks like it may contain real patient information: " + "; ".join(problems[:3])
+                           + ". Please use only made-up details.")
+        key = "X" + secrets.token_hex(3)
+        eid = f"{org}_{key}"
+        now_dt = self.svc.clock.now()
+        with self.db.tx() as c:
+            c.execute("INSERT INTO encounters (id, org, label, arrived_at, priority, primary_user, display_json) VALUES (?,?,?,?,?,?,?)",
+                      (eid, org, label, iso(now_dt), None, user["id"],
+                       json.dumps({"age": age, "sex": sex, "complaint": complaint, "location": location})))
+            c.execute("INSERT INTO encounter_headers VALUES (?,?)", (eid, json.dumps({"mrn": f"SIM-{key}"})))
+            c.execute("INSERT INTO obligations (id, org, encounter_id, kind, due_at, created_at, owner, source) VALUES (?,?,?,?,?,?,?,?)",
+                      (f"ob_{key}", org, eid, "initial_assessment", iso(now_dt + timedelta(minutes=15)), iso(now_dt), user["id"], "learner"))
+            audit(c, iso(now_dt), org, user["id"], "practice_patient_added", "encounter", eid)
+        if note:
+            self.add_note(user, eid, note)
+        return {"ok": True, "encounter_id": eid}
+
+    def add_note(self, user, enc_id, text):
+        t = self._session_for_shadow(user)
+        if t["finished_at"]:
+            raise Conflict("This practice session is finished.")
+        enc = self.db.one("SELECT * FROM encounters WHERE id=? AND org=?", (enc_id, t["sandbox_org"]))
+        if not enc:
+            raise NotFound()
+        if enc["status"] != "active":
+            raise Conflict("This patient has left the unit.")
+        text = str(text or "").strip()
+        if not 5 <= len(text) <= LIMITS["text"]:
+            raise BadInput(f"Please write between 5 and {LIMITS['text']} characters.")
+        problems = phi_problems([text])
+        if problems:
+            raise BadInput("This looks like it may contain real patient information: " + "; ".join(problems[:3])
+                           + ". Please use only made-up details.")
+        self.svc.clock.advance(minutes=1)
+        nid = f"{t['sandbox_org']}:L{secrets.token_hex(3)}"
+        self.svc.ingest_note(enc, {"note_id": nid, "version": 1, "signed_at": iso(self.svc.clock.now() - timedelta(minutes=1)),
+                                   "body": text, "author_employee_id": "LEARNER"}, fixture=True)
+        return {"ok": True}
