@@ -172,7 +172,7 @@ class TestBrowserFocus(unittest.TestCase):
         self.assertIn("Patient reports demo red flag R", riley.locator("#detail-body").inner_text())
         riley.get_by_label("Yes, I think this is an emergency").check()
         riley.get_by_role("button", name="Save my check").click()
-        self.assertIn("reason", riley.locator(".form-result").first.text_content())   # reason is required
+        self.assertIn("reason", riley.locator("#detail-body .form-result").first.text_content())   # reason is required
         riley.get_by_label("Reason (required)").first.fill("Patient looks pale and sweaty at the bedside.")
         riley.get_by_role("button", name="Save my check").click()
         riley.wait_for_function("document.getElementById('detail-body').innerText.includes('Nurse check: this IS an emergency')", timeout=8000)
@@ -214,6 +214,39 @@ class TestBrowserFocus(unittest.TestCase):
         page.get_by_label("Or type a command").fill("open emergencies")
         page.get_by_role("button", name="Go", exact=True).click()
         self.assertEqual(page.evaluate("document.activeElement.id"), "em-h")
+
+    def test_privacy_controls_lock_hide_names_break_glass_dashboard(self):
+        with self.app.store.tx() as c:
+            c.execute("UPDATE encounters SET restricted=1 WHERE id='enc_C'")   # Jordan's patient, not Riley's
+        page = self.signin("Riley, RN (demo)")
+        # lock / unlock
+        page.get_by_role("button", name="Lock", exact=True).click()
+        page.get_by_role("heading", name="Screen locked").wait_for()
+        self.assertTrue(page.evaluate("document.getElementById('app').inert"))
+        page.locator("#lock-pass").fill("wrong")
+        page.get_by_role("button", name="Unlock").click()
+        page.wait_for_function("document.getElementById('lock-error').textContent.length > 0")
+        page.locator("#lock-pass").fill("demo")
+        page.get_by_role("button", name="Unlock").click()
+        page.wait_for_function("document.getElementById('lock').hidden")
+        # hide names
+        page.get_by_role("button", name="Hide names").click()
+        self.assertIn("P.A.", page.locator("#queue").inner_text())
+        page.get_by_role("button", name="Show names").click()
+        # break-the-glass on a restricted record
+        page.get_by_role("button", name="Review Patient C").click()
+        page.get_by_role("heading", name="Restricted record").wait_for()
+        page.get_by_role("button", name="Open record").click()
+        self.assertIn("reason", page.locator(".modal .form-result").text_content())
+        page.locator("#glass-reason").fill("Covering Jordan's break")
+        page.get_by_role("button", name="Open record").click()
+        page.get_by_role("heading", name="Patient C, encounter").wait_for()
+        page.get_by_role("tab", name="Access log").click()
+        page.wait_for_function("document.getElementById('detail-body').innerText.includes('break-the-glass')")
+        # privacy dashboard
+        page.locator(".nav[data-view='privacy']").click()
+        page.wait_for_function("document.getElementById('priv-stats').innerText.includes('Break-the-glass')")
+        self.assertIn("Covering Jordan's break", page.locator("#priv-glass").inner_text())
 
     def test_access_revoked_clears_patient_content(self):
         page = self.signin("Jordan, RN (demo)")

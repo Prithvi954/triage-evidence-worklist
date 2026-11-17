@@ -11,7 +11,9 @@ import json
 import secrets
 from datetime import timedelta
 
-from . import config, emergency, excerpt, validate
+import time
+
+from . import accounts, config, crypto, emergency, excerpt, validate
 from .adapter import BoundaryViolation
 from .clock import iso, parse
 from .db import audit, emit
@@ -22,8 +24,9 @@ NOTE_REVIEW_MINUTES = 15        # every new/amended note must be reviewed within
 LEVEL1_BEDSIDE_MINUTES = 10     # after a confirmed Level 1, a clinician must reach the patient
 ESCALATION_RESPONSE_MINUTES = 5
 UNASSESSED_RANK = 1.5           # unassessed patients sort after Level 1, ahead of Level 2
-CONFIRM_ROLES = {"charge_rn"}   # roles allowed to confirm a priority change (demo protocol)
-CLINICAL_ROLES = {"rn", "charge_rn"}
+CONFIRM_ROLES = {"charge_rn", "provider"}   # roles allowed to confirm a priority change (demo protocol)
+CLINICAL_ROLES = {"rn", "charge_rn", "provider"}
+EDUCATION_ROLES = {"student", "instructor"}
 PRIORITY_LEVELS = (1, 2, 3, 4)
 EMERGENCY_CHECK_MINUTES = 5      # a nurse checks a possible emergency (illustrative)
 EMERGENCY_DECISION_MINUTES = 10  # the charge nurse makes the final call (illustrative)
@@ -63,6 +66,10 @@ class BadInput(Exception):
     pass
 
 
+class BreakGlassRequired(Exception):
+    """Opening a restricted record needs a stated reason (logged and reviewable)."""
+
+
 def _id(prefix):
     return f"{prefix}_{secrets.token_hex(5)}"
 
@@ -84,9 +91,12 @@ class Service:
             for o in self.seed["orgs"]:
                 c.execute("INSERT INTO orgs VALUES (?,?)", (o["id"], o["name"]))
                 c.execute("INSERT INTO feed (org, last_message_at) VALUES (?,?)", (o["id"], now))
+            demo_hash = _demo_password_hash()
             for u in self.seed["users"]:
-                c.execute("INSERT INTO users (id, org, name, role, title, status, covered_by) VALUES (?,?,?,?,?,?,?)",
-                          (u["id"], u["org"], u["name"], u["role"], u["title"], u["status"], u.get("covered_by")))
+                c.execute("INSERT INTO users (id, org, name, role, title, status, covered_by, username, password_hash) "
+                          "VALUES (?,?,?,?,?,?,?,?,?)",
+                          (u["id"], u["org"], u["name"], u["role"], u["title"], u["status"], u.get("covered_by"),
+                           u.get("username"), demo_hash))
             for e in self.seed["encounters"]:
                 c.execute("INSERT INTO encounters (id, org, label, arrived_at, priority, priority_confirmed_by, "
                           "priority_confirmed_at, primary_user) VALUES (?,?,?,?,?,?,?,?)",
@@ -102,29 +112,127 @@ class Service:
                 org = next(e["org"] for e in self.seed["encounters"] if e["id"] == n["encounter"])
                 c.execute("INSERT INTO notes VALUES (?,?,?,?,?,?,?,?,?)",
                           (n["note_id"], n["version"], n["encounter"], org, n["author_employee_id"], n["signed_at"],
-                           n["signed_at"], n["body"], None))
+                           n["signed_at"], crypto.enc(n["body"]), None))
                 # Seeded notes were reviewed before the demo starts.
                 c.execute("INSERT INTO review_items (id, org, encounter_id, note_id, note_version, received_at, state, "
                           "ai_state, reviewed_by, reviewed_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                           (_id("ri"), org, n["encounter"], n["note_id"], n["version"], n["signed_at"], "reviewed",
                            "not_run_seeded", "u_sam", n["signed_at"]))
             c.execute("INSERT INTO sim VALUES ('provider_fault', 'none')")
+        if getattr(self, "education", None):
+            self.education.seed_builtin()
 
     def login(self, user_id):
+        """One-click sign-in for the demo picker (server only allows it when demo_login is on)."""
         u = self.db.one("SELECT * FROM users WHERE id=? AND active=1", (user_id,))
         if not u:
             raise Forbidden()
+        return self._new_session(u), u
+
+    def _new_session(self, u):
         token = secrets.token_urlsafe(24)
         with self.db.tx() as c:
-            c.execute("INSERT INTO sessions VALUES (?,?,?)", (token, user_id, iso(self.clock.now())))
-            audit(c, iso(self.clock.now()), u["org"], user_id, "login", "user", user_id)
-        return token, u
+            c.execute("INSERT INTO sessions (token, user_id, created_at, last_seen) VALUES (?,?,?,?)",
+                      (token, u["id"], iso(self.clock.now()), time.time()))
+            audit(c, iso(self.clock.now()), u["org"], u["id"], "login", "user", u["id"])
+        return token
+
+    throttle = accounts.Throttle()
+
+    def login_password(self, username, password):
+        username = (username or "").strip().lower()
+        if self.throttle.blocked(username):
+            raise Forbidden("Too many failed attempts. Wait 5 minutes and try again.")
+        u = self.db.one("SELECT * FROM users WHERE username=? AND active=1", (username,))
+        if not u or not u["password_hash"] or not accounts.verify_password(password or "", u["password_hash"]):
+            self.throttle.fail(username)
+            log_event(iso(self.clock.now()), "auth.login_failed")
+            raise Forbidden("Wrong username or password.")
+        self.throttle.clear(username)
+        return self._new_session(u), u
 
     def user_for_token(self, token):
         if not token:
             return None
-        return self.db.one("SELECT u.* FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token=? AND u.active=1",
-                           (token,))
+        row = self.db.one("SELECT u.*, s.last_seen AS _last_seen FROM sessions s JOIN users u ON u.id=s.user_id "
+                          "WHERE s.token=? AND u.active=1", (token,))
+        if not row:
+            return None
+        now = time.time()
+        last = row.pop("_last_seen") or now
+        if now - last > self.s.session_idle_minutes * 60:
+            with self.db.tx() as c:
+                c.execute("DELETE FROM sessions WHERE token=?", (token,))
+            return None
+        if now - last > 30:
+            with self.db.tx() as c:
+                c.execute("UPDATE sessions SET last_seen=? WHERE token=?", (now, token))
+        return row
+
+    def verify_current_password(self, user, password):
+        u = self.db.one("SELECT password_hash FROM users WHERE id=?", (user["id"],))
+        if not u or not u["password_hash"] or not accounts.verify_password(password or "", u["password_hash"]):
+            raise Forbidden("Wrong password.")
+        return {"ok": True}
+
+    def change_password(self, user, old, new):
+        self.verify_current_password(user, old)
+        problems = accounts.password_problems(new or "")
+        if problems:
+            raise BadInput("Please use a password with " + " and ".join(problems) + ".")
+        with self.db.tx() as c:
+            c.execute("UPDATE users SET password_hash=? WHERE id=?", (accounts.hash_password(new), user["id"]))
+            audit(c, iso(self.clock.now()), user["org"], user["id"], "password_changed", "user", user["id"])
+        return {"ok": True}
+
+    # who may create which accounts: hospital admins create clinical staff; instructors create learners
+    CREATE_RULES = {"admin": {"rn", "charge_rn", "provider", "admin"}, "instructor": {"student", "instructor"}}
+
+    def create_user(self, actor, username, name, role, title, password):
+        allowed = self.CREATE_RULES.get(actor["role"], set())
+        if role not in allowed:
+            raise Forbidden("You can't create that kind of account.")
+        username = (username or "").strip().lower()
+        if not accounts.USERNAME_RE.match(username):
+            raise BadInput("Please use a username of 3-40 lowercase letters, numbers, dots, dashes or underscores.")
+        name = (name or "").strip()[:60]
+        if not name:
+            raise BadInput("Please enter a display name.")
+        problems = accounts.password_problems(password or "")
+        if problems:
+            raise BadInput("Please use a password with " + " and ".join(problems) + ".")
+        if self.db.one("SELECT 1 FROM users WHERE username=?", (username,)):
+            raise Conflict("That username is taken.")
+        uid = _id("u")
+        with self.db.tx() as c:
+            c.execute("INSERT INTO users (id, org, name, role, title, status, username, password_hash) VALUES (?,?,?,?,?,?,?,?)",
+                      (uid, actor["org"], name, role, (title or accounts.ROLES[role])[:80], "on_shift", username,
+                       accounts.hash_password(password)))
+            audit(c, iso(self.clock.now()), actor["org"], actor["id"], "user_created", "user", uid, role=role)
+        return {"ok": True, "user_id": uid}
+
+    def list_users(self, actor):
+        if actor["role"] not in self.CREATE_RULES:
+            raise Forbidden()
+        return [{"id": u["id"], "username": u["username"], "name": u["name"], "role": u["role"],
+                 "role_text": accounts.ROLES.get(u["role"], u["role"]), "title": u["title"], "active": bool(u["active"])}
+                for u in self.db.q("SELECT * FROM users WHERE org=? AND id NOT LIKE 'trn_%' ORDER BY role, name", (actor["org"],))]
+
+    def set_active(self, actor, user_id, active):
+        target = self.db.one("SELECT * FROM users WHERE id=?", (user_id,))
+        if not target or target["org"] != actor["org"] or target["role"] not in self.CREATE_RULES.get(actor["role"], set()):
+            raise NotFound()
+        if target["id"] == actor["id"]:
+            raise BadInput("You can't deactivate your own account.")
+        with self.db.tx() as c:
+            c.execute("UPDATE users SET active=? WHERE id=?", (1 if active else 0, user_id))
+            if not active:
+                c.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+            audit(c, iso(self.clock.now()), actor["org"], actor["id"], "user_" + ("activated" if active else "deactivated"),
+                  "user", user_id)
+            if not active:
+                emit(c, iso(self.clock.now()), target["org"], "access_revoked", user_id=user_id)
+        return {"ok": True}
 
     def _enc_for(self, user, enc_id):
         """Object-level authorization. Unknown and other-org encounters look identical (404)."""
@@ -165,7 +273,7 @@ class Service:
         with self.db.tx() as c:
             c.execute("INSERT INTO notes VALUES (?,?,?,?,?,?,?,?,?)",
                       (n["note_id"], n["version"], enc["id"], enc["org"], n.get("author_employee_id"), n["signed_at"],
-                       now, n["body"], excerpt_sha(n["body"]) if fixture else None))
+                       now, crypto.enc(n["body"]), excerpt_sha(n["body"]) if fixture else None))
             # An amendment supersedes any still-unreviewed item for an older version of the same note.
             sup = c.execute("SELECT id FROM review_items WHERE note_id=? AND note_version<? AND state='unreviewed'",
                             (n["note_id"], n["version"])).fetchall()
@@ -219,8 +327,10 @@ class Service:
         if item["state"] == "superseded":   # amended before we started: don't send the old text at all
             self._finish(job, item, "stale_discarded", None)
             return
-        note = self.db.one("SELECT * FROM notes WHERE note_id=? AND version=?", (job["note_id"], job["note_version"]))
-        earlier =self.db.q("SELECT note_id, version, body, signed_at FROM notes WHERE encounter_id=? AND "
+        note = self.db.one("SELECT note_id, version, encounter_id, org, author_employee_id, signed_at, received_at, "
+                           "dec(body) AS body, fixture_sha256 FROM notes WHERE note_id=? AND version=?",
+                           (job["note_id"], job["note_version"]))
+        earlier =self.db.q("SELECT note_id, version, dec(body) AS body, signed_at FROM notes WHERE encounter_id=? AND "
                             "NOT (note_id=? AND version>=?)", (note["encounter_id"], note["note_id"], note["version"]))
         ex = excerpt.select(note, earlier)
         if ex.abstain_reason:
@@ -273,7 +383,7 @@ class Service:
                       (call_id, item["id"], item["org"], item["encounter_id"], note["note_id"], note["version"],
                        settings.mode, res.provenance, res.model or settings.model, config.PROMPT_VERSION,
                        config.SCHEMA_VERSION, config.SELECTOR_VERSION, config.RULES_VERSION, now, done, outcome,
-                       res.provider_request_id, json.dumps(req), res.text,
+                       res.provider_request_id, crypto.enc(json.dumps(req)), crypto.enc(res.text),
                        json.dumps({"errors": result["errors"], "omitted_fields": ex.omitted_fields,
                                    "comparison_available": ex.comparison_available,
                                    "repeated": ex.repeated_sentences, "reviewer_note": result["reviewer_note"],
@@ -297,7 +407,7 @@ class Service:
                       (call_id, item["id"], item["org"], item["encounter_id"], note["note_id"], note["version"],
                        self.s.mode, prov, model or self.s.model, config.PROMPT_VERSION, config.SCHEMA_VERSION,
                        config.SELECTOR_VERSION, config.RULES_VERSION, now, finished or now, outcome, rid,
-                       json.dumps(req) if req else None, resp, val))
+                       crypto.enc(json.dumps(req)) if req else None, crypto.enc(resp), val))
 
     def _retry_or_fail(self, job, item, outcome, call_id):
         j = self.db.one("SELECT * FROM jobs WHERE id=?", (job["id"],))
@@ -326,7 +436,7 @@ class Service:
             emit(c, now, item["org"], "ai_status", item_id=item["id"], unreviewed=self._unreviewed(c, item["org"]))
 
     # ------------------------------------------------------------------ clinician actions
-    def decide(self, user, item_id, decision, corrections=None, comment="", expected_version=None):
+    def decide(self, user, item_id, decision, corrections=None, comment="", expected_version=None, disclosed=False):
         it = self._item_for(user, item_id)
         if decision not in ("accept", "correct", "reject", "reviewed_no_ai"):
             raise BadInput("decision")
@@ -346,6 +456,8 @@ class Service:
                           "WHERE id=? AND state='unreviewed' AND version=?", (user["id"], now, item_id, it["version"]))
             if r.rowcount != 1:
                 raise Conflict("Already reviewed by someone else.")
+            if disclosed:
+                c.execute("INSERT OR IGNORE INTO ai_disclosures VALUES (?,?,?)", (item_id, user["id"], now))
             c.execute("INSERT INTO decisions VALUES (?,?,?,?,?,?,?,?)",
                       (_id("dc"), item_id, it["encounter_id"], user["id"], now, decision, json.dumps(corrections), comment))
             # The note-review obligation completes when every unreviewed version of the note is handled.
@@ -446,6 +558,10 @@ class Service:
 
     # ------------------------------------------------------------------ periodic checks
     def tick(self):
+        self.purge_old_ai_text()
+        self._tick_obligations()
+
+    def _tick_obligations(self):
         """Overdue escalation and feed-staleness. Idempotent; never changes a deadline."""
         now_dt = self.clock.now()
         now = iso(now_dt)
@@ -521,6 +637,7 @@ class Service:
                 "unreviewed_notes": sum(1 for i in items if i["encounter_id"] == e["id"]),
                 "emergency": next((EMERGENCY_STATUS_TEXT[f["status"]] for f in flags if f["encounter_id"] == e["id"]), None),
                 "emergency_open": any(f["encounter_id"] == e["id"] and f["status"] in OPEN_FLAG for f in flags),
+                "restricted": bool(e["restricted"]),
                 "_key": (rank, next_due or "9999", e["arrived_at"], e["id"]),
             })
         queue.sort(key=lambda q: q["_key"])
@@ -553,16 +670,98 @@ class Service:
         }
 
     def _display(self, enc_id):
-        """Fictional demographics for the track board (synthetic seed only; never sent to the AI)."""
+        """Demographics for the track board (stored with the encounter; never sent to the AI)."""
+        row = self.db.one("SELECT display_json FROM encounters WHERE id=?", (enc_id,))
+        if row and row["display_json"]:
+            return json.loads(row["display_json"])
         e = next((x for x in self.seed["encounters"] if x["id"] == enc_id), None)
         return (e or {}).get("display", {})
 
-    def review_item_detail(self, user, item_id):
+    # ------------------------------------------------------------------ privacy: access log + break-the-glass
+    def _on_care_team(self, user, enc):
+        if user["id"] == enc["primary_user"]:
+            return True
+        primary = self.db.one("SELECT status, covered_by FROM users WHERE id=?", (enc["primary_user"],)) if enc["primary_user"] else None
+        return bool(primary and primary["status"] != "on_shift" and primary["covered_by"] == user["id"])
+
+    def _check_access(self, user, enc, action, reason=None):
+        """Every chart open is logged. Restricted records need a reason unless you are on the care team."""
+        reason = (reason or "").strip()[:300]
+        glass = 0
+        if enc.get("restricted") and not self._on_care_team(user, enc):
+            if len(reason) < 5:
+                raise BreakGlassRequired()
+            glass = 1
+        now = iso(self.clock.now())
+        with self.db.tx() as c:
+            c.execute("INSERT INTO chart_access (ts, org, user_id, encounter_id, action, reason, break_glass) VALUES (?,?,?,?,?,?,?)",
+                      (now, enc["org"], user["id"], enc["id"], action, reason or None, glass))
+            if glass:
+                audit(c, now, enc["org"], user["id"], "break_glass", "encounter", enc["id"])
+                emit(c, now, enc["org"], "break_glass", encounter_id=enc["id"])
+
+    def access_log(self, user, enc_id):
+        e = self._enc_for(user, enc_id)
+        rows = self.db.q("SELECT a.*, u.name, u.title FROM chart_access a JOIN users u ON u.id=a.user_id WHERE a.encounter_id=? "
+                         "ORDER BY a.seq DESC LIMIT 200", (e["id"],))
+        return [{"at": r["ts"], "by": f"{r['name']}, {r['title']}", "action": r["action"].replace("_", " "),
+                 "reason": r["reason"], "break_glass": bool(r["break_glass"])} for r in rows]
+
+    def privacy_summary(self, user):
+        """Live privacy facts for this unit: what left the server, whether any identifier did, who opened what."""
+        if user["role"] not in CLINICAL_ROLES and user["role"] != "admin":
+            raise Forbidden()
+        org = user["org"]
+        calls = self.db.q("SELECT request_json, finished_at, outcome FROM model_calls WHERE org=?", (org,))
+        sent = [crypto.dec(c["request_json"]) for c in calls if c["request_json"]]
+        identifiers = set()
+        for h in self.db.q("SELECT h.header_json FROM encounter_headers h JOIN encounters e ON e.id=h.encounter_id WHERE e.org=?", (org,)):
+            for k, v in json.loads(h["header_json"]).items():
+                if isinstance(v, str) and len(v) >= 4:
+                    identifiers.add((k, v))
+        for u in self.db.q("SELECT name FROM users WHERE org=?", (org,)):
+            if len(u["name"]) >= 4:
+                identifiers.add(("staff_name", u["name"]))
+        found = sorted({k for k, v in identifiers for body in sent if v in body})
+        scrubbed = sum(body.count("removed]") for body in sent)
+        purged = sum(1 for c in calls if not c["request_json"])
+        access = self.db.q("SELECT COUNT(*) n, SUM(break_glass) g FROM chart_access WHERE org=?", (org,))[0]
+        glass = self.db.q("SELECT a.ts, a.reason, u.name, e.label FROM chart_access a JOIN users u ON u.id=a.user_id "
+                          "JOIN encounters e ON e.id=a.encounter_id WHERE a.org=? AND a.break_glass=1 ORDER BY a.seq DESC LIMIT 20", (org,))
+        chart_notes = self.db.one("SELECT COUNT(*) n FROM chart_notes WHERE org=?", (org,))["n"]
+        return {
+            "ai_requests": len(calls), "ai_requests_with_text_kept": len(sent), "ai_requests_purged": purged,
+            "identifier_types_checked": sorted({k for k, _ in identifiers}),
+            "identifiers_found_in_ai_requests": found,
+            "scrubbed_tokens": scrubbed,
+            "typed_or_dictated_notes": chart_notes, "typed_or_dictated_sent_to_ai": 0,
+            "retention_days": self.s.ai_retention_days,
+            "encryption_at_rest": crypto.enabled(),
+            "chart_opens_logged": access["n"] or 0, "break_glass_count": access["g"] or 0,
+            "break_glass_recent": [{"at": g["ts"], "by": g["name"], "patient": g["label"], "reason": g["reason"]} for g in glass],
+            "deployment": self.s.deployment,
+            "ai_real_notes_allowed": self.s.ai_may_send_real_notes(),
+        }
+
+    def purge_old_ai_text(self):
+        """Retention: drop saved AI request/response text after N days. Metadata, findings and decisions stay."""
+        cutoff = iso(self.clock.now() - timedelta(days=self.s.ai_retention_days))
+        with self.db.tx() as c:
+            r = c.execute("UPDATE model_calls SET request_json=NULL, response_json=NULL WHERE finished_at < ? AND "
+                          "(request_json IS NOT NULL OR response_json IS NOT NULL)", (cutoff,))
+            n = r.rowcount
+        if n:
+            log_event(iso(self.clock.now()), "retention.ai_text_purged", count=n)
+        return n
+
+    def review_item_detail(self, user, item_id, reason=None):
         it = self._item_for(user, item_id)
         enc = self._enc_for(user, it["encounter_id"])
-        note = self.db.one("SELECT note_id, version, signed_at, received_at, body FROM notes WHERE note_id=? AND version=?",
+        self._check_access(user, enc, "view_note_review", reason)
+        disclosed = self.db.one("SELECT 1 FROM ai_disclosures WHERE review_item_id=?", (item_id,))
+        note = self.db.one("SELECT note_id, version, signed_at, received_at, dec(body) AS body FROM notes WHERE note_id=? AND version=?",
                            (it["note_id"], it["note_version"]))
-        others = self.db.q("SELECT note_id, version, signed_at, body FROM notes WHERE encounter_id=? AND NOT "
+        others = self.db.q("SELECT note_id, version, signed_at, dec(body) AS body FROM notes WHERE encounter_id=? AND NOT "
                            "(note_id=? AND version=?) ORDER BY signed_at, version", (enc["id"], it["note_id"], it["note_version"]))
         call = self.db.one("SELECT * FROM model_calls WHERE review_item_id=? ORDER BY started_at DESC, rowid DESC LIMIT 1", (item_id,))
         fds = self.db.q("SELECT * FROM findings WHERE review_item_id=? ORDER BY idx", (item_id,))
@@ -579,17 +778,19 @@ class Service:
             "decisions": [{"by": d["name"], "at": d["decided_at"], "decision": d["decision"],
                            "corrections": json.loads(d["corrections_json"] or "{}"), "comment": d["comment"]} for d in decs],
             "label_ai": "AI-assisted, unverified. Check every item against the original note.",
+            "ai_disclosed": bool(disclosed),
         }
 
-    def ai_request_view(self, user, item_id):
-        """'What Claude received' demo panel: only for approved synthetic fixtures, read-only."""
+    def ai_request_view(self, user, item_id, reason=None):
+        """'What Claude received' panel: read-only view of exactly what was sent."""
         it = self._item_for(user, item_id)
+        self._check_access(user, self._enc_for(user, it["encounter_id"]), "view_ai_request", reason)
         call = self.db.one("SELECT * FROM model_calls WHERE review_item_id=? AND request_json IS NOT NULL "
                            "ORDER BY started_at DESC, rowid DESC LIMIT 1", (item_id,))
         note = self.db.one("SELECT fixture_sha256 FROM notes WHERE note_id=? AND version=?", (it["note_id"], it["note_version"]))
         if not call or not note or not note["fixture_sha256"]:
             raise NotFound()
-        req = json.loads(call["request_json"])
+        req = json.loads(crypto.dec(call["request_json"]))
         val = json.loads(call["validation_json"] or "{}")
         return {"mode": call["mode"], "provenance": call["provenance"], "model": call["model"],
                 "outcome": call["outcome"], "provider_request_id": call["provider_request_id"],
@@ -603,18 +804,19 @@ class Service:
                                                             "effort": req["output_config"].get("effort")},
                                           "tools": "none", "thinking": "model default (adaptive)"},
                 "omitted_fields": val.get("omitted_fields", []),
-                "returned_text": call["response_json"]}
+                "returned_text": crypto.dec(call["response_json"])}
 
-    def encounter_detail(self, user, enc_id):
+    def encounter_detail(self, user, enc_id, reason=None):
         e = self._enc_for(user, enc_id)
+        self._check_access(user, e, "view_chart", reason)
         st = self.state(user)
         row = next((q for q in st["queue"] if q["encounter_id"] == enc_id), None)
-        notes = self.db.q("SELECT note_id, version, signed_at, received_at, body FROM notes WHERE encounter_id=? "
+        notes = self.db.q("SELECT note_id, version, signed_at, received_at, dec(body) AS body FROM notes WHERE encounter_id=? "
                           "ORDER BY signed_at, version", (enc_id,))
         items = self.db.q("SELECT id, note_id, note_version, state, ai_state FROM review_items WHERE encounter_id=? "
                           "AND state='unreviewed' ORDER BY received_at, id", (enc_id,))
         escs = self.db.q("SELECT id, raised_at, reason_code, status FROM escalations WHERE encounter_id=? ORDER BY raised_at", (enc_id,))
-        docs = self.db.q("SELECT d.id, d.note_type, d.created_at, d.body, d.input_method, u.name, u.title FROM chart_notes d "
+        docs = self.db.q("SELECT d.id, d.note_type, d.created_at, dec(d.body) AS body, d.input_method, u.name, u.title FROM chart_notes d "
                          "JOIN users u ON u.id=d.author_user WHERE d.encounter_id=? ORDER BY d.created_at, d.id", (enc_id,))
         return {"encounter_id": e["id"], "label": e["label"], "status": e["status"], "version": e["version"],
                 "queue_row": row, "notes": notes,
@@ -624,7 +826,7 @@ class Service:
                                "created_at": d["created_at"], "body": d["body"], "input_method": d["input_method"],
                                "author": f"{d['name']}, {d['title']}"} for d in docs],
                 "emergencies": self.emergencies(user, enc_id)["flags"],
-                "note_types": NOTE_TYPES}
+                "note_types": NOTE_TYPES, "restricted": bool(e["restricted"])}
 
     # ------------------------------------------------------------------ chart documents (nurse-written)
     def add_chart_note(self, user, enc_id, body, note_type="nursing_note", input_method="typed"):
@@ -642,7 +844,7 @@ class Service:
         nid = _id("doc")
         with self.db.tx() as c:
             c.execute("INSERT INTO chart_notes VALUES (?,?,?,?,?,?,?,?)",
-                      (nid, e["org"], enc_id, user["id"], note_type, now, body, input_method))
+                      (nid, e["org"], enc_id, user["id"], note_type, now, crypto.enc(body), input_method))
             audit(c, now, e["org"], user["id"], "chart_note_added", "encounter", enc_id, note=nid, method=input_method)
             flags = self._run_emergency_rules(c, e, body, nid, user["id"])
             emit(c, now, e["org"], "chart_note_added", encounter_id=enc_id)
@@ -864,6 +1066,17 @@ def _call_meta(call):
         return None
     return {k: call[k] for k in ("mode", "provenance", "model", "prompt_version", "schema_version", "selector_version",
                                  "rules_version", "started_at", "finished_at", "outcome", "provider_request_id")}
+
+
+_DEMO_HASH = None
+
+
+def _demo_password_hash():
+    """Demo accounts share the training password "demo" (hashed once per process)."""
+    global _DEMO_HASH
+    if _DEMO_HASH is None:
+        _DEMO_HASH = accounts.hash_password("demo")
+    return _DEMO_HASH
 
 
 def excerpt_sha(body):

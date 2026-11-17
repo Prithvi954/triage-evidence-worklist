@@ -77,6 +77,10 @@ body.no-hints .hint, body.no-hints .howto { display: none; }
 .login-head .org { font-size: .85rem; opacity: .8; }
 .login-body { padding: 1rem 1.2rem 1.3rem; }
 .login-body h1 { font-size: 1.25rem; }
+.login-form { display: grid; gap: .3rem; margin-top: .6rem; }
+.login-form label { font-weight: 600; font-size: .9rem; margin-top: .3rem; }
+.login-form button { margin-top: .6rem; min-height: 38px; }
+.demo-h { font-size: .95rem; margin-top: 1rem; padding-top: .8rem; border-top: 1px solid var(--line2); }
 .login-list { display: grid; gap: .45rem; margin: .9rem 0 0; }
 .login-card { display: grid; gap: .1rem; }
 .login-card .hint { margin: 0 .2rem; font-size: .85rem; }
@@ -294,3 +298,42 @@ mark { background: #ffe066; color: #1b1300; padding: 0 .1rem; }
   .inbox > li { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ---------- secondary pages (admin, learning hub) ---------- */
+body.page { min-height: 100vh; }
+.page-main { max-width: 72rem; margin: 0 auto; padding: 1rem 1rem 3rem; display: grid; gap: 1rem; }
+.page-main h1 { font-size: 1.35rem; }
+.page-main h2 { margin-bottom: .4rem; }
+.form-grid { display: grid; grid-template-columns: max-content minmax(0, 26rem); gap: .45rem .8rem; align-items: center; }
+.form-grid label { font-weight: 600; font-size: .9rem; }
+.subnav { display: flex; flex-wrap: wrap; gap: 0; border-bottom: 1px solid var(--line); background: var(--surface); }
+.subnav button { border: 0; border-radius: 0; background: none; border-bottom: 3px solid transparent; padding: .5rem 1rem; min-height: 40px; color: var(--muted); }
+.subnav button[aria-current="page"] { color: var(--text); border-bottom-color: var(--accent); font-weight: 700; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: .7rem; }
+.sc-card { background: var(--surface); border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: var(--radius);
+  padding: .6rem .8rem .8rem; display: grid; gap: .35rem; align-content: start; }
+.sc-card h3 { margin: 0; font-size: 1rem; }
+.sc-meta { font-size: .82rem; color: var(--muted); }
+.score-big { font-size: 2.2rem; font-weight: 800; color: var(--accent-d); }
+.result-ok { color: var(--ok-fg); font-weight: 700; }
+.result-miss { color: var(--bad-fg); font-weight: 700; }
+.result-part { color: var(--warn-fg); font-weight: 700; }
+.editor-row { display: grid; gap: .35rem .6rem; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); align-items: end;
+  border: 1px solid var(--line2); border-radius: var(--radius); padding: .5rem .6rem; background: var(--panel); }
+.editor-row .wide { grid-column: 1 / -1; }
+.editor-row label { font-size: .82rem; font-weight: 600; display: grid; gap: .15rem; }
+.training-bar { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem .9rem; background: #1e5f3a; color: #fff;
+  padding: .4rem .8rem; border-radius: var(--radius); }
+.training-bar button { background: #fff; color: #1e5f3a; border-color: #fff; }
+.lock-screen { position: fixed; inset: 0; z-index: 200; background: rgba(15, 30, 50, .92); display: grid; place-items: center; }
+.lock-card { background: var(--surface); color: var(--text); border-radius: 6px; padding: 1.2rem 1.4rem; width: min(24rem, 90vw); display: grid; gap: .5rem; }
+.modal-back { position: fixed; inset: 0; z-index: 150; background: rgba(15, 30, 50, .55); display: grid; place-items: center; }
+.modal { background: var(--surface); color: var(--text); border-radius: 6px; padding: 1rem 1.2rem; width: min(30rem, 92vw); display: grid; gap: .5rem; }
+.tag-lock { color: #5b3a8c; background: #efe7fa; }
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr)); gap: .6rem; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: .6rem .8rem; }
+.stat .n { font-size: 1.8rem; font-weight: 800; }
+.stat .l { font-size: .85rem; color: var(--muted); }
+.stat.good .n { color: var(--ok-fg); }
+.stat.bad .n { color: var(--bad-fg); }
+@media (max-width: 40rem) { .form-grid { grid-template-columns: 1fr; } }

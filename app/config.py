@@ -31,6 +31,26 @@ class Settings:
     # Feed is considered stalled if no EHR message arrives within this many minutes (illustrative).
     feed_stall_minutes: int = 15
     max_job_attempts: int = 3
+    # "demo" (synthetic, demo sign-in picker), "education" (school accounts, scenarios), or
+    # "clinical" (real data: requires an encryption key; AI on real notes only with a confirmed BAA).
+    deployment: str = field(default_factory=lambda: os.environ.get("TRIAGE_DEPLOYMENT", "demo"))
+    # Show the one-click training-user picker on the sign-in page (never in clinical deployments).
+    demo_login: bool = field(default_factory=lambda: os.environ.get("TRIAGE_DEMO_LOGIN", "1") == "1")
+    # The facility has an executed BAA with Anthropic and a HIPAA-ready organization for this API key.
+    baa_confirmed: bool = field(default_factory=lambda: os.environ.get("TRIAGE_BAA_CONFIRMED", "0") == "1")
+    session_idle_minutes: int = field(default_factory=lambda: int(os.environ.get("TRIAGE_SESSION_IDLE_MIN", "30")))
+    # Screen locks on the shared workstation after this many idle minutes (client side).
+    lock_minutes: int = field(default_factory=lambda: int(os.environ.get("TRIAGE_LOCK_MIN", "3")))
+    # Saved AI request/response text is purged after this many days (decisions and audit are kept).
+    ai_retention_days: int = field(default_factory=lambda: int(os.environ.get("TRIAGE_AI_RETENTION_DAYS", "7")))
+    # Optional FHIR R4 source (e.g. an EHR sandbox). Bearer token comes from the environment only.
+    fhir_base_url: str = field(default_factory=lambda: os.environ.get("TRIAGE_FHIR_BASE_URL", ""))
+    fhir_token: str = field(default_factory=lambda: os.environ.get("TRIAGE_FHIR_TOKEN", ""))
+    fhir_org: str = field(default_factory=lambda: os.environ.get("TRIAGE_FHIR_ORG", "org_n"))
+
+    def ai_may_send_real_notes(self) -> bool:
+        """Real (non-synthetic) note text may go to the AI only in a clinical deployment with a BAA."""
+        return self.deployment == "clinical" and self.baa_confirmed and self.mode == "live"
 
 
 # Versions recorded with every model call so changes can be evaluated and rolled back.

@@ -28,10 +28,34 @@
     </div>
     <div class="login-body">
       <h1 id="login-h" tabindex="-1">Sign in</h1>
-      <p class="hint">Select a training user. In production this uses the facility's single sign-on.</p>
-      <ul id="login-list" class="plain login-list"></ul>
+      <form id="login-form" class="login-form">
+        <label for="login-user">Username</label>
+        <input id="login-user" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        <label for="login-pass">Password</label>
+        <input id="login-pass" type="password" autocomplete="current-password" required>
+        <button type="submit" class="primary">Sign in</button>
+        <p id="login-error" class="form-result" role="alert"></p>
+      </form>
+      <div id="demo-users" hidden>
+        <h2 class="demo-h">Training users</h2>
+        <p class="hint">One-click sign-in for practice. Password for typed sign-in: <strong>demo</strong>.</p>
+        <ul id="login-list" class="plain login-list"></ul>
+      </div>
     </div>
   </div>
+</section>
+
+<!-- Shared-workstation lock. Patient content is hidden while locked. -->
+<section id="lock" class="lock-screen" aria-labelledby="lock-h" hidden>
+  <form id="lock-form" class="lock-card">
+    <h1 id="lock-h" tabindex="-1">Screen locked</h1>
+    <p id="lock-who" class="hint"></p>
+    <label for="lock-pass">Password</label>
+    <input id="lock-pass" type="password" autocomplete="current-password" required>
+    <button type="submit" class="primary">Unlock</button>
+    <button type="button" id="lock-signout">Sign out instead</button>
+    <p id="lock-error" class="form-result" role="alert"></p>
+  </form>
 </section>
 
 <!-- ============ Workstation ============ -->
@@ -69,6 +93,8 @@
           <p id="voice-privacy" class="hint small"></p>
         </section>
       </div>
+      <button type="button" id="hide-names" class="tb-btn" aria-pressed="false">Hide names</button>
+      <button type="button" id="lock-now" class="tb-btn">Lock</button>
       <div class="textsize" role="group" aria-label="Text size">
         <button type="button" data-size="1" aria-pressed="true" aria-label="Normal text size">A</button>
         <button type="button" data-size="1.18" aria-pressed="false" aria-label="Large text size">A+</button>
@@ -93,6 +119,7 @@
       <li><button type="button" class="nav" data-view="emergencies">Emergencies<span class="badge badge-red" id="nav-emerg"></span></button></li>
       <li><button type="button" class="nav" data-view="inbox">Notes to review<span class="badge badge-alert" id="nav-inbox"></span></button></li>
       <li><button type="button" class="nav" data-view="overdue">Overdue tasks<span class="badge badge-alert" id="nav-overdue"></span></button></li>
+      <li><button type="button" class="nav" data-view="privacy">Privacy</button></li>
       <li class="nav-sep" aria-hidden="true"></li>
       <li><button type="button" class="nav" data-view="tools">Simulator</button></li>
       <li><button type="button" class="nav" data-view="help">Help</button></li>
@@ -178,6 +205,19 @@
           <tbody id="ob-body"></tbody>
         </table>
       </div>
+    </section>
+
+    <!-- View: privacy dashboard -->
+    <section class="view" data-view="privacy" aria-labelledby="priv-h" hidden>
+      <div class="view-head">
+        <h2 id="priv-h" tabindex="-1">Privacy</h2>
+        <p class="hint">Live facts for this unit, checked against the actual data.</p>
+      </div>
+      <div id="priv-stats" class="stat-grid"></div>
+      <div class="panel"><h3>What is protected</h3><ul id="priv-facts"></ul></div>
+      <div class="table-wrap"><table><caption>Recent break-the-glass access</caption>
+        <thead><tr><th scope="col">Time</th><th scope="col">Who</th><th scope="col">Patient</th><th scope="col">Reason</th></tr></thead>
+        <tbody id="priv-glass"></tbody></table></div>
     </section>
 
     <!-- View: simulator -->

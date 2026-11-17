@@ -85,21 +85,30 @@ function flushAnnouncements() {
 async function showLogin() {
   $("app").hidden = true; $("login").hidden = false;
   if (es) { es.close(); es = null; }
-  const ORDER = ["u_riley", "u_sam", "u_jordan", "u_casey"];
-  const users = (await (await fetch("/api/demo-users")).json())
-    .sort((a, b) => (ORDER.indexOf(a.id) + 99) % 99 - (ORDER.indexOf(b.id) + 99) % 99);
+  let cfg = { demo_login: true };
+  try { cfg = await (await fetch("/api/config")).json(); } catch (_) { /* keep defaults */ }
   const ul = $("login-list"); ul.replaceChildren();
-  for (const u of users) {
-    const descId = `ud-${u.id}`;
-    ul.append(el("li", { class: "login-card" },
-      el("button", { type: "button", class: u.id === "u_riley" ? "primary big" : "big", "aria-describedby": descId,
-        onclick: () => login(u.id) }, `Sign in as ${u.label}`),
-      el("p", { id: descId, class: "hint" }, USER_HELP[u.id] || "")));
+  $("demo-users").hidden = !cfg.demo_login;
+  if (cfg.demo_login) {
+    const ORDER = ["u_riley", "u_sam", "u_drlee", "u_jordan", "u_morgan", "u_taylor", "u_avery", "u_alex", "u_casey"];
+    const users = (await (await fetch("/api/demo-users")).json())
+      .sort((a, b) => ((ORDER.indexOf(a.id) + 99) % 99) - ((ORDER.indexOf(b.id) + 99) % 99));
+    for (const u of users) {
+      const descId = `ud-${u.id}`;
+      ul.append(el("li", { class: "login-card" },
+        el("button", { type: "button", class: u.id === "u_riley" ? "primary big" : "big", "aria-describedby": descId,
+          onclick: () => login({ user_id: u.id }) }, `Sign in as ${u.label}`),
+        el("p", { id: descId, class: "hint" }, USER_HELP[u.id] || "")));
+    }
   }
   $("login-h").focus();
 }
-async function login(id) {
-  await api("POST", "/api/login", { user_id: id });
+
+async function login(creds) {
+  let r;
+  try { r = await api("POST", "/api/login", creds); }
+  catch (e) { $("login-error").textContent = e.message === "forbidden" ? "Sign-in failed." : e.message; $("login-pass").focus(); return; }
+  if (r.home && r.home !== "/") { location.href = r.home; return; }
   $("login").hidden = true; $("app").hidden = false;
   await refresh();
   connect();
@@ -235,7 +244,7 @@ function renderQueue() {
     },
     (li, q) => {
       const disp = q.display || {};
-      li.querySelector(".pt-name").textContent = q.label;
+      li.querySelector(".pt-name").textContent = shownName(q.label);
       const parts = [`Position ${q.position} of ${n}.`, `${q.priority_text}` +
         (q.priority_confirmed_by ? `, confirmed by ${q.priority_confirmed_by.split(",")[0]} at ${hhmm(q.priority_confirmed_at)}.` : ", no confirmed priority yet."),
         disp.age ? `${disp.age} ${disp.sex === "F" ? "female" : "male"}, ${disp.complaint}, ${disp.location}.` : "",
@@ -263,6 +272,7 @@ function renderQueue() {
       if (q.emergency_open) tags.push(el("span", { class: "tag tag-em" }, "Emerg?"));
       else if (q.emergency && q.emergency.startsWith("Emergency confirmed")) tags.push(el("span", { class: "tag tag-em" }, "Emergency"));
       if (overdue) tags.push(el("span", { class: "tag tag-od" }, "Overdue"));
+      if (q.restricted) tags.push(el("span", { class: "tag tag-lock" }, "Restricted"));
       if (q.unreviewed_notes) tags.push(el("span", { class: "tag tag-note" }, `Note ×${q.unreviewed_notes}`));
       li.querySelector(".c-flags").replaceChildren(...tags);
     });
@@ -362,7 +372,8 @@ function rememberCurrent(encounterId, label) {
 }
 
 async function openEncounter(encId, keepFocus, tab = "summary") {
-  const d = await api("GET", `/api/encounters/${encId}`);
+  const d = await getWithGlass(`/api/encounters/${encId}`, encId);
+  if (!d) return;
   rememberCurrent(encId, d.label);
   openDetail = { kind: "encounter", id: encId, encounterId: encId, label: d.label, tab };
   fromRowKey = encId;
@@ -373,7 +384,8 @@ async function openEncounter(encId, keepFocus, tab = "summary") {
   const disp = (q && q.display) || {};
   const header = el("div", { class: "chart-header" },
     el("div", { class: "chart-id" },
-      el("span", { class: "pt" }, d.label),
+      el("span", { class: "pt" }, shownName(d.label)),
+      d.restricted ? el("span", { class: "tag tag-lock" }, "Restricted record") : null,
       disp.age ? el("span", {}, `${disp.age} y · ${disp.sex}`) : null,
       el("span", { class: `lvl lvl-b-${q && q.priority ? q.priority : "u"}` }, q ? q.priority_text : d.status),
       disp.complaint ? el("span", {}, `CC: ${disp.complaint}`) : null,
@@ -470,6 +482,17 @@ async function openEncounter(encId, keepFocus, tab = "summary") {
     { id: "notes", label: `Notes & documents (${allNotes.length})`, render: notesTab },
     { id: "write", label: "Write note", render: writeTab },
     { id: "emerg", label: `Emergencies (${d.emergencies.length})`, render: emergTab },
+    { id: "access", label: "Access log", render: () => {
+      const box = el("div", {}, el("p", { class: "hint" }, "Loading who has opened this chart…"));
+      api("GET", `/api/encounters/${encId}/access-log`).then((rows) => box.replaceChildren(
+        el("p", { class: "hint" }, "Every time someone opens this chart it is recorded here. Restricted records require a reason."),
+        el("div", { class: "table-wrap" }, el("table", {}, el("caption", {}, `${rows.length} recent chart opens`),
+          el("thead", {}, el("tr", {}, ...["Time", "Who", "What", "Reason"].map((h) => el("th", { scope: "col" }, h)))),
+          el("tbody", {}, ...rows.map((r) => el("tr", {}, el("td", {}, hhmm(r.at)), el("td", {}, r.by),
+            el("td", {}, r.break_glass ? `${r.action} (break-the-glass)` : r.action), el("td", {}, r.reason || "—")))))))
+      ).catch(() => box.replaceChildren(el("p", {}, "Access log unavailable.")));
+      return [box];
+    } },
   ];
   const tabsEl = makeTabs(tabs, tab, encId);
   openDetail.selectTab = tabsEl.selectTab;
@@ -744,7 +767,8 @@ function openEscalate(encId, label) {
 }
 
 async function openItem(itemId) {
-  const d = await api("GET", `/api/review-items/${itemId}`);
+  const d = await getWithGlass(`/api/review-items/${itemId}`, null);
+  if (!d) return;
   rememberCurrent(d.encounter_id, d.label);
   openDetail = { kind: "item", id: itemId, encounterId: d.encounter_id, label: d.label, state: d.state, submitted: false };
   if (!fromRowKey || (openDetail && openDetail.encounterId !== fromRowKey)) fromRowKey = d.encounter_id;
@@ -834,7 +858,8 @@ function decisionForm(d, draft, usable) {
     for (const [fid, fields] of Object.entries(draft.corrections)) if (Object.keys(fields).length) corrections[fid] = fields;
     const decision = draft.decision === "accept" && Object.keys(corrections).length ? "correct" : draft.decision;
     try {
-      await api("POST", `/api/review-items/${d.item_id}/decision`, { decision, corrections, comment: draft.comment, expected_version: d.version });
+      await api("POST", `/api/review-items/${d.item_id}/decision`, { decision, corrections, comment: draft.comment,
+        expected_version: d.version, disclosed: !!draft.disclosed });
       openDetail.submitted = true; delete drafts[d.item_id];
       if (d.encounter_id === "enc_B") { tour.decided = true; saveTour(); }
       result.textContent = S.me.can_confirm_priority
@@ -844,7 +869,10 @@ function decisionForm(d, draft, usable) {
     } catch (e) { result.textContent = `Not recorded: ${e.message}. Your draft is kept.`; result.focus(); }
   } },
     el("fieldset", {}, el("legend", {}, "Your review of this note"), radios,
-      el("label", { for: "dec-comment" }, "Comment (optional)"), ta),
+      el("label", { for: "dec-comment" }, "Comment (optional)"), ta,
+      el("p", {}, el("input", { type: "checkbox", id: "dec-disclosed", checked: !!draft.disclosed,
+        onchange: (e) => { draft.disclosed = e.target.checked; } }), " ",
+        el("label", { for: "dec-disclosed" }, "I told the patient that AI assisted with this review"))),
     el("button", { type: "submit", class: "primary" }, "Record review decision"), result);
 }
 
@@ -873,7 +901,7 @@ function whatClaudeReceived(itemId) {
   const det = el("details", { ontoggle: async () => {
     if (!det.open || box.childElementCount) return;
     try {
-      const r = await api("GET", `/api/review-items/${itemId}/ai-request`);
+      const r = await getWithGlass(`/api/review-items/${itemId}/ai-request`, null);
       box.append(
         el("p", {}, `Processing mode: ${r.mode}. ${describeProvenance(r.provenance, r.outcome)}. Model setting: ${r.model}. Endpoint: ${r.endpoint}.`),
         el("h4", {}, "Exact outbound excerpts"),
@@ -926,6 +954,11 @@ const USER_HELP = {
   u_sam: "Charge nurse. Can approve a change in how urgent a patient is. Use in a second window.",
   u_jordan: "Nurse who is on a break. Sam covers Jordan's patients.",
   u_casey: "Nurse at a different clinic. Cannot see this clinic's patients, which shows the privacy protection.",
+  u_drlee: "Resident physician. Can review evidence and confirm priority changes.",
+  u_morgan: "Clinical instructor. Builds scenarios, approves student cases, sees class results.",
+  u_taylor: "Nursing student. Practices scenarios and builds their own cases.",
+  u_avery: "Medical student. Practices scenarios and builds their own cases.",
+  u_alex: "Unit administrator. Creates staff accounts.",
 };
 const NOTE_HELP = {
   "note_B2:1": "Start here: send a new note for Patient B (a symptom they denied before is now reported)",
@@ -1011,13 +1044,15 @@ function setTextSize(scale) {
   try { localStorage.setItem("textsize", String(scale)); } catch (_) { /* ignore */ }
 }
 // ---------------------------------------------------------------- pages (views)
-const VIEW_HEADINGS = { patients: "queue-h", emergencies: "em-h", inbox: "inbox-h", overdue: "ob-h", tools: "demo-h", help: "help-h" };
+const VIEW_HEADINGS = { patients: "queue-h", emergencies: "em-h", inbox: "inbox-h", overdue: "ob-h", tools: "demo-h", help: "help-h",
+  privacy: "priv-h" };
 let currentView = "patients";
 function showView(name, focus = true) {
   currentView = name;
   document.querySelectorAll(".view").forEach((v) => { v.hidden = v.dataset.view !== name; });
   document.querySelectorAll(".nav").forEach((b) => {
     if (b.dataset.view === name) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current"); });
+  if (name === "privacy") loadPrivacy();
   if (focus) $(VIEW_HEADINGS[name]).focus();
 }
 
@@ -1094,7 +1129,122 @@ function simBind() {
 
 document.addEventListener("DOMContentLoaded", async () => {
   simBind();
+  $("login-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    $("login-error").textContent = "";
+    login({ username: $("login-user").value.trim(), password: $("login-pass").value });
+  });
+  try { const me = await api("GET", "/api/me"); if (me.home && me.home !== "/") { location.href = me.home; return; } }
+  catch (_) { return; }   // not signed in: showLogin() already ran
   try { await refresh(); if (S) { $("app").hidden = false; connect(); loadFixtures(); } }
   catch (_) { /* showLogin already called on 401 */ }
   setInterval(() => { if (S && connState !== "down") refresh(); }, 30000);
 });
+
+// ---------------------------------------------------------------- privacy: names, lock, break-the-glass, dashboard
+let hideNames = false;
+function shownName(label) {
+  if (!hideNames || !label) return label;
+  return label.split(/\s+/).map((w) => w[0].toUpperCase() + ".").join("");
+}
+
+function askReason(title, text) {
+  return new Promise((resolve) => {
+    const prev = document.activeElement;
+    const ta = el("textarea", { id: "glass-reason", rows: 3 });
+    const err = el("p", { class: "form-result", role: "alert" });
+    const close = (v) => { back.remove(); $("app").inert = false; if (prev && prev.focus) prev.focus(); resolve(v); };
+    const form = el("form", { class: "modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "glass-h",
+      onsubmit: (e) => { e.preventDefault(); if (ta.value.trim().length < 5) { err.textContent = "Please write a reason."; ta.focus(); return; } close(ta.value.trim()); } },
+      el("h2", { id: "glass-h", tabindex: "-1" }, title), el("p", {}, text),
+      el("label", { for: "glass-reason" }, "Reason (recorded and reviewed by the privacy officer)"), ta, err,
+      el("div", { class: "btns" }, el("button", { type: "submit", class: "primary" }, "Open record"),
+        el("button", { type: "button", onclick: () => close(null) }, "Cancel")));
+    form.addEventListener("keydown", (e) => { if (e.key === "Escape") close(null); });
+    const back = el("div", { class: "modal-back" }, form);
+    document.body.append(back);
+    $("app").inert = true;
+    ta.focus();
+  });
+}
+
+async function getWithGlass(path) {
+  try { return await api("GET", path); }
+  catch (e) {
+    if (e.message !== "break_glass_required") throw e;
+    const reason = await askReason("Restricted record",
+      "This patient's record is restricted. You're not on their care team, so opening it needs a reason. This access will be logged.");
+    if (!reason) { say("Record not opened."); return null; }
+    return api("GET", `${path}${path.includes("?") ? "&" : "?"}reason=${encodeURIComponent(reason)}`);
+  }
+}
+
+async function loadPrivacy() {
+  let p;
+  try { p = await api("GET", "/api/privacy"); } catch (_) { return; }
+  const stat = (n, l, cls) => el("div", { class: `stat ${cls || ""}` }, el("div", { class: "n" }, String(n)), el("div", { class: "l" }, l));
+  const leaks = p.identifiers_found_in_ai_requests.length;
+  $("priv-stats").replaceChildren(
+    stat(p.ai_requests, "Requests sent to the AI"),
+    stat(leaks, leaks ? `Identifier types found in AI requests: ${p.identifiers_found_in_ai_requests.join(", ")}` : "Identifiers found in AI requests", leaks ? "bad" : "good"),
+    stat(p.scrubbed_tokens, "Codes, links or numbers scrubbed before sending"),
+    stat(p.typed_or_dictated_sent_to_ai, `Typed or dictated notes sent to the AI (of ${p.typed_or_dictated_notes})`, "good"),
+    stat(p.chart_opens_logged, "Chart opens logged"),
+    stat(p.break_glass_count, "Break-the-glass openings"),
+    stat(p.ai_requests_purged, `AI records purged (kept ${p.retention_days} days)`),
+    stat(p.encryption_at_rest ? "On" : "Off", "Encryption of note text at rest", p.encryption_at_rest ? "good" : ""));
+  $("priv-facts").replaceChildren(
+    el("li", {}, `Checked for: ${p.identifier_types_checked.join(", ")}.`),
+    el("li", {}, "Only short excerpts of approved notes are ever sent, with names, record numbers and dates removed."),
+    el("li", {}, p.ai_real_notes_allowed ? "Real notes may be sent to the AI (clinical mode, business associate agreement confirmed)."
+      : "Real or typed notes are never sent to the AI in this deployment."),
+    el("li", {}, `Saved AI requests and responses are deleted after ${p.retention_days} days; nurse decisions and history are kept.`),
+    el("li", {}, "The screen locks after a few idle minutes, and spoken alerts never include a patient's name."));
+  $("priv-glass").replaceChildren(...(p.break_glass_recent.length ? p.break_glass_recent.map((g) => el("tr", {},
+    el("td", {}, hhmm(g.at)), el("td", {}, g.by), el("td", {}, g.patient), el("td", {}, g.reason)))
+    : [el("tr", {}, el("td", { colspan: "4" }, "None."))]));
+}
+
+let lockTimer = null, lockMinutes = 3, locked = false;
+function armLock() {
+  clearTimeout(lockTimer);
+  if (locked || !S) return;
+  lockTimer = setTimeout(lockScreen, lockMinutes * 60000);
+}
+function lockScreen() {
+  if (!S || locked) return;
+  locked = true;
+  $("lock-who").textContent = `Signed in as ${S.me.name}, ${S.me.title}. Enter your password to continue.`;
+  $("lock-error").textContent = "";
+  $("lock").hidden = false;
+  $("app").inert = true;
+  $("app").setAttribute("aria-hidden", "true");
+  $("pins").hidden = true;
+  $("lock-h").focus();
+}
+async function unlockScreen(password) {
+  try { await api("POST", "/api/unlock", { password }); }
+  catch (e) { $("lock-error").textContent = e.message === "forbidden" ? "Wrong password." : e.message; $("lock-pass").select(); return; }
+  locked = false;
+  $("lock").hidden = true; $("lock-pass").value = "";
+  $("app").inert = false; $("app").removeAttribute("aria-hidden");
+  renderPins();
+  armLock();
+  $("main").focus();
+}
+function privacyBind() {
+  fetch("/api/config").then((r) => r.json()).then((c) => { lockMinutes = c.lock_minutes || 3; armLock(); }).catch(() => {});
+  ["keydown", "pointerdown", "wheel", "touchstart"].forEach((ev) => document.addEventListener(ev, () => { if (!locked) armLock(); }, { passive: true }));
+  $("lock-now").addEventListener("click", lockScreen);
+  $("lock-form").addEventListener("submit", (e) => { e.preventDefault(); unlockScreen($("lock-pass").value); });
+  $("lock-signout").addEventListener("click", async () => { try { await api("POST", "/api/logout", {}); } catch (_) { /* ignore */ } location.reload(); });
+  $("hide-names").addEventListener("click", () => {
+    hideNames = !hideNames;
+    $("hide-names").setAttribute("aria-pressed", String(hideNames));
+    $("hide-names").textContent = hideNames ? "Show names" : "Hide names";
+    if (S) renderQueue();
+    if (openDetail && openDetail.kind === "encounter") openEncounter(openDetail.id, true, openDetail.tab);
+    say(hideNames ? "Patient names hidden on screen." : "Patient names shown.");
+  });
+}
+document.addEventListener("DOMContentLoaded", privacyBind);

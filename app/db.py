@@ -82,7 +82,40 @@ CREATE TABLE IF NOT EXISTS emergency_flags (
 CREATE TABLE IF NOT EXISTS emergency_events (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, flag_id TEXT NOT NULL, org TEXT NOT NULL, at TEXT NOT NULL,
   user_id TEXT NOT NULL, action TEXT NOT NULL, decision TEXT, reason TEXT);
+-- privacy: who opened which chart, and why (break-the-glass)
+CREATE TABLE IF NOT EXISTS chart_access (
+  seq INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, org TEXT NOT NULL, user_id TEXT NOT NULL,
+  encounter_id TEXT NOT NULL, action TEXT NOT NULL, reason TEXT, break_glass INTEGER NOT NULL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS ai_disclosures (
+  review_item_id TEXT PRIMARY KEY, user_id TEXT NOT NULL, at TEXT NOT NULL);
+-- texts an instructor (or the built-in library) approved as synthetic, so they may be sent to the AI
+CREATE TABLE IF NOT EXISTS approved_texts (sha TEXT PRIMARY KEY, approved_by TEXT NOT NULL, at TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS note_replay (
+  note_id TEXT NOT NULL, version INTEGER NOT NULL, replay_note_id TEXT NOT NULL, replay_version INTEGER NOT NULL,
+  PRIMARY KEY (note_id, version));
+-- education
+CREATE TABLE IF NOT EXISTS scenarios (
+  id TEXT PRIMARY KEY, org TEXT NOT NULL, title TEXT NOT NULL, summary TEXT NOT NULL, goals TEXT NOT NULL,
+  role TEXT NOT NULL, status TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+  spec_json TEXT NOT NULL, review_comment TEXT);
+CREATE TABLE IF NOT EXISTS training_sessions (
+  id TEXT PRIMARY KEY, scenario_id TEXT NOT NULL, user_id TEXT NOT NULL, home_org TEXT NOT NULL, sandbox_org TEXT NOT NULL,
+  shadow_user TEXT NOT NULL, parent_token TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT,
+  event_index INTEGER NOT NULL DEFAULT 0, events_total INTEGER NOT NULL DEFAULT 0, score_json TEXT);
+-- integration: last sync per FHIR source
+CREATE TABLE IF NOT EXISTS fhir_sync (source TEXT PRIMARY KEY, org TEXT NOT NULL, last_sync_at TEXT, last_error TEXT,
+  encounters INTEGER NOT NULL DEFAULT 0, notes INTEGER NOT NULL DEFAULT 0);
 """
+
+# Columns added after the first release. Applied idempotently to existing databases.
+MIGRATIONS = [
+    "ALTER TABLE users ADD COLUMN username TEXT",
+    "ALTER TABLE users ADD COLUMN password_hash TEXT",
+    "ALTER TABLE sessions ADD COLUMN last_seen REAL",
+    "ALTER TABLE encounters ADD COLUMN restricted INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE encounters ADD COLUMN display_json TEXT",
+    "CREATE UNIQUE INDEX IF NOT EXISTS users_username ON users(username)",
+]
 
 
 class Store:
@@ -94,6 +127,13 @@ class Store:
         self.conn = sqlite3.connect(path, check_same_thread=False, isolation_level=None)
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        for sql in MIGRATIONS:
+            try:
+                self.conn.execute(sql)
+            except sqlite3.OperationalError:
+                pass   # already applied
+        from . import crypto
+        self.conn.create_function("dec", 1, crypto.dec, deterministic=True)
 
     @contextmanager
     def tx(self):

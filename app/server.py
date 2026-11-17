@@ -9,13 +9,13 @@ import threading
 import time
 from http import cookies
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from . import config, safelog
 from .adapter import Adapter, load_allowlist
 from .clock import Clock, iso
 from .db import Store
-from .services import BadInput, Conflict, Forbidden, NotFound, Service
+from .services import BadInput, BreakGlassRequired, Conflict, Forbidden, NotFound, Service
 
 STATIC = os.path.join(config.ROOT, "static")
 SEED = os.path.join(config.ROOT, "fixtures", "seed.json")
@@ -38,6 +38,7 @@ ANNOUNCE = {
     "emergency_flag": lambda p: "Possible emergency flagged for a patient. Open the Emergencies page to check it.",
     "emergency_updated": lambda p: "An emergency flag was updated. See the Emergencies page.",
     "chart_note_added": lambda p: None,
+    "break_glass": lambda p: None,
     "access_revoked": lambda p: None,
 }
 
@@ -142,6 +143,13 @@ def make_handler(app: App):
         def _err(self, code, msg):
             self._json(code, {"error": msg})
 
+        def _q(self, name):
+            v = parse_qs(urlparse(self.path).query).get(name)
+            return v[0][:300] if v else None
+
+        def _cookie(self, tok):
+            return f"sid={tok}; HttpOnly; SameSite=Strict; Path=/" + ("; Secure" if app.settings.secure_cookies else "")
+
         def _user(self):
             c = cookies.SimpleCookie(self.headers.get("Cookie", ""))
             tok = c["sid"].value if "sid" in c else None
@@ -171,15 +179,25 @@ def make_handler(app: App):
                     self._raw = self.rfile.read(n) if n else b"{}"
                     if self.headers.get("X-Requested-With") != "triage-ui":   # CSRF: custom header + SameSite=Strict
                         return self._err(403, "forbidden")
+                if path == "/api/config" and method == "GET":   # public, no secrets
+                    return self._json(200, {"deployment": app.settings.deployment, "demo_login": app.settings.demo_login,
+                                            "lock_minutes": app.settings.lock_minutes})
                 if path == "/api/demo-users" and method == "GET":
-                    return self._json(200, [{"id": u["id"], "label": f"{u['name']}, {u['title']}"}
-                                            for u in app.store.q("SELECT * FROM users WHERE active=1 ORDER BY org, id")])
+                    if not app.settings.demo_login:
+                        return self._json(200, [])
+                    return self._json(200, [{"id": u["id"], "label": f"{u['name']}, {u['title']}", "role": u["role"]}
+                                            for u in app.store.q("SELECT * FROM users WHERE active=1 AND id NOT LIKE 'trn_%' "
+                                                                 "ORDER BY org, id")])
                 if path == "/api/login" and method == "POST":
                     b = self._body()
-                    tok, u = svc.login(str(b.get("user_id", "")))
-                    return self._json(200, {"ok": True}, extra={
-                        "Set-Cookie": f"sid={tok}; HttpOnly; SameSite=Strict; Path=/"
-                                      + ("; Secure" if app.settings.secure_cookies else "")})
+                    if b.get("username") is not None:
+                        tok, u = svc.login_password(str(b.get("username", ""))[:80], str(b.get("password", ""))[:200])
+                    elif app.settings.demo_login:
+                        tok, u = svc.login(str(b.get("user_id", "")))
+                    else:
+                        raise Forbidden("Please sign in with your username and password.")
+                    return self._json(200, {"ok": True, "role": u["role"], "home": _home_for(u["role"])},
+                                      extra={"Set-Cookie": self._cookie(tok)})
                 user = self._user()
                 if not user:
                     return self._err(401, "unauthenticated")
@@ -190,13 +208,16 @@ def make_handler(app: App):
                 return self._dispatch(method, parts, user)
             except NotFound:
                 return self._err(404, "not_found")
-            except Forbidden:
-                return self._err(403, "forbidden")
+            except BreakGlassRequired:
+                return self._err(403, "break_glass_required")
+            except Forbidden as e:
+                return self._err(403, str(e) or "forbidden")
             except Conflict as e:
                 return self._err(409, str(e))
             except BadInput as e:
                 msg = str(e)
-                return self._err(413 if msg == "too_large" else 400, msg if msg.startswith("Please") else "bad_request")
+                return self._err(413 if msg == "too_large" else 400,
+                                 msg if (msg.startswith("Please") or msg.endswith(".")) else "bad_request")
             except BrokenPipeError:
                 return None
             except Exception as e:
@@ -205,7 +226,24 @@ def make_handler(app: App):
 
         def _dispatch(self, m, p, user):
             if m == "GET" and p == ["me"]:
-                return self._json(200, {"id": user["id"], "name": user["name"], "title": user["title"], "role": user["role"]})
+                return self._json(200, {"id": user["id"], "name": user["name"], "title": user["title"], "role": user["role"],
+                                        "org": user["org"], "home": _home_for(user["role"]),
+                                        "can_manage_users": user["role"] in svc.CREATE_RULES,
+                                        "creatable_roles": sorted(svc.CREATE_RULES.get(user["role"], set()))})
+            if m == "POST" and p == ["unlock"]:
+                return self._json(200, svc.verify_current_password(user, str(self._body().get("password", ""))[:200]))
+            if m == "POST" and p == ["me", "password"]:
+                b = self._body()
+                return self._json(200, svc.change_password(user, str(b.get("old", ""))[:200], str(b.get("new", ""))[:200]))
+            if m == "GET" and p == ["admin", "users"]:
+                return self._json(200, svc.list_users(user))
+            if m == "POST" and p == ["admin", "users"]:
+                b = self._body()
+                return self._json(200, svc.create_user(user, str(b.get("username", "")), str(b.get("name", "")),
+                                                       str(b.get("role", "")), str(b.get("title", "")),
+                                                       str(b.get("password", ""))[:200]))
+            if m == "POST" and len(p) == 4 and p[:2] == ["admin", "users"] and p[3] in ("activate", "deactivate"):
+                return self._json(200, svc.set_active(user, p[2], p[3] == "activate"))
             if m == "POST" and p == ["logout"]:
                 with app.store.tx() as c:
                     c.execute("DELETE FROM sessions WHERE user_id=?", (user["id"],))
@@ -215,13 +253,18 @@ def make_handler(app: App):
             if m == "GET" and p == ["events"]:
                 return self._sse(user)
             if m == "GET" and len(p) == 2 and p[0] == "review-items":
-                return self._json(200, svc.review_item_detail(user, p[1]))
+                return self._json(200, svc.review_item_detail(user, p[1], self._q("reason")))
             if m == "GET" and len(p) == 3 and p[0] == "review-items" and p[2] == "ai-request":
-                return self._json(200, svc.ai_request_view(user, p[1]))
+                return self._json(200, svc.ai_request_view(user, p[1], self._q("reason")))
+            if m == "GET" and len(p) == 3 and p[0] == "encounters" and p[2] == "access-log":
+                return self._json(200, svc.access_log(user, p[1]))
+            if m == "GET" and p == ["privacy"]:
+                return self._json(200, svc.privacy_summary(user))
             if m == "POST" and len(p) == 3 and p[0] == "review-items" and p[2] == "decision":
                 b = self._body()
                 return self._json(200, svc.decide(user, p[1], b.get("decision"), b.get("corrections"),
-                                                  str(b.get("comment", ""))[:1001], b.get("expected_version")))
+                                                  str(b.get("comment", ""))[:1001], b.get("expected_version"),
+                                                  bool(b.get("disclosed"))))
             if m == "GET" and p == ["emergencies"]:
                 return self._json(200, svc.emergencies(user))
             if m == "POST" and len(p) == 3 and p[0] == "encounters" and p[2] == "notes":
@@ -240,7 +283,7 @@ def make_handler(app: App):
                 return self._json(200, svc.determine_flag(user, p[1], b.get("determination"), str(b.get("reason", "")),
                                                           b.get("expected_version")))
             if m == "GET" and len(p) == 2 and p[0] == "encounters":
-                return self._json(200, svc.encounter_detail(user, p[1]))
+                return self._json(200, svc.encounter_detail(user, p[1], self._q("reason")))
             if m == "GET" and len(p) == 3 and p[0] == "encounters" and p[2] == "obligations":
                 return self._json(200, svc.encounter_obligations(user, p[1]))
             if m == "POST" and len(p) == 3 and p[0] == "encounters" and p[2] == "priority":
@@ -383,7 +426,31 @@ def make_handler(app: App):
     return H
 
 
+def _home_for(role):
+    """Which page a role lands on after sign-in."""
+    return "/learn.html" if role in ("student", "instructor") else ("/admin.html" if role == "admin" else "/")
+
+
+def check_deployment(settings):
+    """Refuse unsafe configurations for real-data use. Returns a list of problems (empty = OK)."""
+    from . import crypto
+    problems = []
+    if settings.deployment == "clinical":
+        if not crypto.enabled():
+            problems.append("TRIAGE_DATA_KEY must be set (notes are encrypted at rest).")
+        if settings.demo_login:
+            problems.append("TRIAGE_DEMO_LOGIN must be 0 (no one-click sign-in).")
+        if settings.demo_controls:
+            problems.append("TRIAGE_DEMO_CONTROLS must be 0 (no simulator).")
+        if not settings.secure_cookies:
+            problems.append("TRIAGE_SECURE_COOKIES must be 1 (HTTPS only).")
+    return problems
+
+
 def main():
+    problems = check_deployment(config.Settings())
+    if problems:
+        raise SystemExit("Refusing to start in clinical mode:\n- " + "\n- ".join(problems))
     app = App()
     if app.settings.mode == "live" and not os.environ.get("ANTHROPIC_API_KEY"):
         print("TRIAGE_MODE=live but ANTHROPIC_API_KEY is not set. Live calls will fail and show "

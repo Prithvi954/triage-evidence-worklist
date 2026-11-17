@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>User administration · Triage Evidence Worklist</title>
+<link rel="stylesheet" href="/app.css">
+<script src="/common.js" defer></script>
+<script src="/admin.js" defer></script>
+</head>
+<body class="page">
+<a class="skip" href="#main">Skip to main content</a>
+<div id="announcer" class="visually-hidden" role="status" aria-live="polite" aria-atomic="true"></div>
+<header class="topbar">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="currentColor" d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z"/></svg></span>
+    <span class="product">Triage Evidence Worklist</span><span class="dept">User administration</span>
+  </div>
+  <div class="topbar-right">
+    <div class="user"><span class="avatar" aria-hidden="true" id="avatar">?</span><span id="s-user"></span></div>
+    <button type="button" id="logout" class="tb-btn">Sign out</button>
+  </div>
+</header>
+<main id="main" class="page-main" tabindex="-1">
+  <h1 id="page-h" tabindex="-1">User administration</h1>
+  <p class="hint">Create and deactivate accounts for your unit. In production, accounts come from the facility's identity provider.</p>
+
+  <section class="panel" aria-labelledby="new-h">
+    <h2 id="new-h">New account</h2>
+    <form id="new-user" class="form-grid">
+      <label for="nu-name">Display name</label><input id="nu-name" type="text" required maxlength="60">
+      <label for="nu-username">Username</label><input id="nu-username" type="text" required autocapitalize="none" spellcheck="false" maxlength="40">
+      <label for="nu-role">Role</label><select id="nu-role"></select>
+      <label for="nu-title">Title (optional)</label><input id="nu-title" type="text" maxlength="80">
+      <label for="nu-pass">Temporary password</label><input id="nu-pass" type="password" required autocomplete="new-password">
+      <div></div><button type="submit" class="primary">Create account</button>
+    </form>
+    <p id="new-result" class="form-result" tabindex="-1"></p>
+  </section>
+
+  <section aria-labelledby="users-h">
+    <h2 id="users-h">Accounts</h2>
+    <div class="table-wrap">
+      <table><caption id="users-cap">Accounts in your unit</caption>
+        <thead><tr><th scope="col">Name</th><th scope="col">Username</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Action</th></tr></thead>
+        <tbody id="users-body"></tbody></table>
+    </div>
+  </section>
+
+  <section class="panel" aria-labelledby="pw-h">
+    <h2 id="pw-h">Change my password</h2>
+    <form id="pw-form" class="form-grid">
+      <label for="pw-old">Current password</label><input id="pw-old" type="password" required autocomplete="current-password">
+      <label for="pw-new">New password</label><input id="pw-new" type="password" required autocomplete="new-password">
+      <div></div><button type="submit">Change password</button>
+    </form>
+    <p id="pw-result" class="form-result" tabindex="-1"></p>
+  </section>
+</main>
+</body>
+</html>

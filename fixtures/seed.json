@@ -8,6 +8,10 @@
     {
       "id": "org_s",
       "name": "Demo Clinic South (synthetic)"
+    },
+    {
+      "id": "org_school",
+      "name": "Demo School of Nursing & Medicine (synthetic)"
     }
   ],
   "users": [
@@ -17,7 +21,8 @@
       "name": "Riley",
       "role": "rn",
       "title": "RN (demo)",
-      "status": "on_shift"
+      "status": "on_shift",
+      "username": "riley"
     },
     {
       "id": "u_sam",
@@ -25,7 +30,8 @@
       "name": "Sam",
       "role": "charge_rn",
       "title": "Charge RN (demo; qualified confirmer role)",
-      "status": "on_shift"
+      "status": "on_shift",
+      "username": "sam"
     },
     {
       "id": "u_jordan",
@@ -34,7 +40,8 @@
       "role": "rn",
       "title": "RN (demo)",
       "status": "on_break",
-      "covered_by": "u_sam"
+      "covered_by": "u_sam",
+      "username": "jordan"
     },
     {
       "id": "u_casey",
@@ -42,7 +49,53 @@
       "name": "Casey",
       "role": "rn",
       "title": "RN, other clinic (demo)",
-      "status": "on_shift"
+      "status": "on_shift",
+      "username": "casey"
+    },
+    {
+      "id": "u_morgan",
+      "org": "org_school",
+      "name": "Morgan",
+      "role": "instructor",
+      "title": "Clinical instructor (demo)",
+      "status": "on_shift",
+      "username": "morgan"
+    },
+    {
+      "id": "u_taylor",
+      "org": "org_school",
+      "name": "Taylor",
+      "role": "student",
+      "title": "Nursing student (demo)",
+      "status": "on_shift",
+      "username": "taylor"
+    },
+    {
+      "id": "u_avery",
+      "org": "org_school",
+      "name": "Avery",
+      "role": "student",
+      "title": "Medical student (demo)",
+      "status": "on_shift",
+      "username": "avery"
+    },
+    {
+      "id": "u_drlee",
+      "org": "org_n",
+      "name": "Dr. Lee",
+      "role": "provider",
+      "title": "Resident physician (demo)",
+      "status": "on_shift",
+      "username": "drlee"
+    },
+    {
+      "id": "u_alex",
+      "org": "org_n",
+      "name": "Alex",
+      "role": "admin",
+      "title": "Unit administrator (demo)",
+      "status": "on_shift",
+      "username": "alex"
     }
   ],
   "encounters": [
