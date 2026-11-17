@@ -1,6 +1,6 @@
 # Triage Evidence Worklist (EmoryHacks · Coder for Good)
 
-An accessible, clinician-controlled worklist for a **simulated** adult urgent-care facility. When a new or amended note arrives, Claude extracts source-quoted candidate evidence of what changed. A nurse verifies it against the original note, and only an authorized clinician can change the official care order.
+An accessible, clinician-controlled worklist **and a training platform for nursing students, medical students and residents**, set in a **simulated** adult urgent-care facility. When a new or amended note arrives, Claude extracts source-quoted candidate evidence of what changed. A nurse verifies it against the original note, and only an authorized clinician can change the official care order.
 
 > **Synthetic data only. Not a medical device. Not for clinical use.** All patients, notes, times, and staffing are fictional. "Demo signal A/B" are placeholders, not clinical findings.
 
@@ -38,9 +38,27 @@ python3 -m venv .venv && .venv/bin/pip install anthropic          # + playwright
 | Baseline vs Claude eval | `.venv/bin/python -m scripts.evaluate --mode replay` (or `--mode live`) |
 | Record real replays | `.venv/bin/python -m scripts.record_replays` (live; writes provenance `captured_live`) |
 
-Configuration (environment only; nothing secret in the repo): `TRIAGE_MODE` (`replay`|`live`), `TRIAGE_MODEL` (default `claude-opus-5-5`), `TRIAGE_EFFORT` (`medium`), `TRIAGE_PORT` (8765), `TRIAGE_DEMO_CONTROLS` (1). The browser never receives the key and never calls Anthropic.
+Configuration (environment only; nothing secret in the repo): `TRIAGE_MODE` (`replay`|`live`), `TRIAGE_MODEL` (default `claude-opus-5-5`), `TRIAGE_EFFORT` (`medium`), `TRIAGE_PORT` (8765), `TRIAGE_DEMO_CONTROLS` (1).
 
-**Latest results (2026-11-14):** 57/57 tests pass (unit, integration, HTTP, privacy canaries, headless Chromium). **Live Claude was not called**: no credentials were available while building. Every model result so far is a labeled replay of an authored fixture. See `docs/07-test-report.md`.
+More settings: `TRIAGE_DEPLOYMENT` (`demo`|`education`|`clinical`), `TRIAGE_DEMO_LOGIN` (1 = one-click demo sign-in), `TRIAGE_DATA_KEY` (Fernet key; encrypts notes and AI payloads at rest. Make one with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`), `TRIAGE_BAA_CONFIRMED` (only with an executed BAA), `TRIAGE_SESSION_IDLE_MIN` (30), `TRIAGE_LOCK_MIN` (3), `TRIAGE_AI_RETENTION_DAYS` (7), `TRIAGE_FHIR_BASE_URL`, `TRIAGE_FHIR_TOKEN`, `TRIAGE_FHIR_ORG`. In `clinical` mode the server refuses to start unless encryption, real accounts, HTTPS cookies and no demo controls are set. The browser never receives the key and never calls Anthropic.
+
+**Latest results (2026-11-17):** 88/88 tests pass (unit, integration, HTTP, privacy canaries, accounts, education scoring, FHIR connector against a fake EHR, headless Chromium). **Live Claude was not called**: no credentials were available while building. Every model result so far is a labeled replay of an authored fixture. See `docs/07-test-report.md`.
+
+## Three ways to use it
+
+| Mode | Who | What it does |
+|---|---|---|
+| **Education** (ready to pilot) | Students, residents, instructors | **Learning hub** (`/learn.html`): scenario library, private practice sandboxes, automatic scoring with feedback, **student Case Builder** (add your own patients, timed notes and emergencies), instructor review, class results |
+| **Demo** (default) | Anyone | The full worklist with synthetic patients and one-click demo sign-in |
+| **Clinical** (future, with a hospital partner) | Nurses, charge nurses, providers | Real accounts only, encryption required, read-only **FHIR R4** EHR connector, real notes sent to AI only with a confirmed BAA |
+
+Demo sign-ins (password `demo`): **riley** (RN), **sam** (charge RN), **jordan** (RN, other unit), **drlee** (provider), **alex** (admin), **taylor** (nursing student), **avery** (medical student), **morgan** (instructor).
+
+**Practice in 4 steps (students):** sign in as Taylor → **Start practice** on a scenario → work the board, pressing **Next event** to receive new notes → **Finish and see my score**. Build your own case under **My cases**, practice it, then **Submit to class**; an instructor (Morgan) approves it into the class library. The case builder blocks things that look like real patient information, and student cases are sent to the AI only after approval.
+
+**Privacy features:** password accounts with lockout and idle sign-out, **Lock** screen and auto-lock, **Hide names**, per-chart **access log**, **break-the-glass** with a written reason for restricted records, a **Privacy** page showing exactly what was sent to the AI, AI-text retention purge, encryption at rest (`TRIAGE_DATA_KEY`), and patient identifiers scrubbed from anything that could reach the AI.
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for the path from classroom pilot to hospital pilot, and [docs/OUTREACH.md](docs/OUTREACH.md) for a one-pager and emails to schools and hospitals.
 
 ## Deploy (Render, free)
 
@@ -97,6 +115,8 @@ Legend: ✅ implemented and tested · 🟡 implemented, untested · 📝 propose
 8. [Validation plan](docs/08-validation-plan.md)
 9. [Two-minute demo script](docs/09-demo-script.md)
 10. [If Claude disappears mid-shift: exact path](docs/10-ai-off-path.md)
+11. [Roadmap: hackathon → classroom → hospital](docs/ROADMAP.md)
+12. [Outreach kit: one-pager and emails](docs/OUTREACH.md)
 
 ## Code map
 

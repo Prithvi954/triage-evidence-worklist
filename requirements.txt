@@ -1,2 +1,3 @@
-# Runtime: the only third-party package the server needs.
+# Runtime packages.
 anthropic==2.8.0
+cryptography>=42
