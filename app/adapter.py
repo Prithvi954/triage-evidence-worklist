@@ -101,7 +101,7 @@ class Adapter:
         self.allow_real_notes = False             # set by the app: only in clinical mode with a confirmed BAA
 
     # ---- gates -------------------------------------------------------------------------
-    def check_fixture_boundary(self, alias_map: dict, sources: list, fixture_bodies: dict) -> None:
+    def check_fixture_boundary(self, alias_map: dict, sources: list, fixture_bodies: dict, identifiers=()) -> None:
         for s in sources:
             ref = alias_map.get(s["alias"])
             if not ref:
@@ -119,9 +119,9 @@ class Adapter:
                 pass   # built-in or instructor-approved synthetic scenario text
             else:
                 raise BoundaryViolation("source is not an approved, unmodified synthetic fixture")
-            from .excerpt import scrub
+            from .excerpt import scrub, scrub_ids
             for part in s["text"].split(" [...] "):
-                if part not in scrub(body):
+                if part not in scrub(scrub_ids(body, identifiers)):
                     raise BoundaryViolation("excerpt text not derived from the approved fixture")
 
     def check_features(self, req: dict) -> None:

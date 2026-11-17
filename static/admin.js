@@ -39,5 +39,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     out.focus();
   });
   loadUsers();
+  loadFhir();
+  $("fhir-sync").addEventListener("click", async () => {
+    const out = $("fhir-result");
+    try { const r = await api("POST", "/api/admin/fhir/sync", {});
+      out.textContent = `Synced: ${r.encounters} new encounters, ${r.notes} new notes, ${r.closed} closed.`; loadFhir(); }
+    catch (e) { out.textContent = e.message === "bad_request" ? "Sync failed." : e.message; }
+    out.focus();
+  });
   $("page-h").focus();
 });
+
+async function loadFhir() {
+  const f = await api("GET", "/api/admin/fhir");
+  const st = f.status[0];
+  $("fhir-status").textContent = !f.configured ? "Not configured. The unit uses the simulator only."
+    : !st ? "Configured; not synced yet."
+    : `Last sync ${ymdhm(st.last_sync_at)}${st.last_error ? ` failed (${st.last_error})` : " OK"} · ${st.encounters} encounters and ${st.notes} notes imported so far.`;
+  $("fhir-sync").disabled = !f.configured;
+}

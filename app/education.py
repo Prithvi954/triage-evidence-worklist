@@ -348,7 +348,7 @@ class Education:
                            arrived if p["priority"] else None, None if p["restricted"] else shadow, 1 if p["restricted"] else 0,
                            json.dumps({"age": p["age"], "sex": p["sex"], "complaint": p["complaint"], "location": p["location"]})))
                 c.execute("INSERT INTO encounter_headers VALUES (?,?)",
-                          (eid, json.dumps({"name": p["label"], "mrn": f"SIM-{hexid}-{p['key']}"})))
+                          (eid, json.dumps({"mrn": f"SIM-{hexid}-{p['key']}"})))
                 kind, mins = ("reassessment", 30 + 5 * i) if p["priority"] else ("initial_assessment", 15)
                 c.execute("INSERT INTO obligations (id, org, encounter_id, kind, due_at, created_at, owner, source) VALUES (?,?,?,?,?,?,?,?)",
                           (f"ob_{hexid}_{p['key']}", org, eid, kind, iso(now_dt + timedelta(minutes=mins)), now,

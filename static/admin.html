@@ -47,6 +47,15 @@
     </div>
   </section>
 
+  <section class="panel" aria-labelledby="fhir-h">
+    <h2 id="fhir-h">EHR connection (FHIR)</h2>
+    <p class="hint">Reads in-progress encounters and clinical notes from the hospital's EHR (FHIR R4), read-only. Configure with
+      TRIAGE_FHIR_BASE_URL and TRIAGE_FHIR_TOKEN on the server.</p>
+    <p id="fhir-status">Checking…</p>
+    <button type="button" id="fhir-sync">Sync now</button>
+    <p id="fhir-result" class="form-result" tabindex="-1"></p>
+  </section>
+
   <section class="panel" aria-labelledby="pw-h">
     <h2 id="pw-h">Change my password</h2>
     <form id="pw-form" class="form-grid">

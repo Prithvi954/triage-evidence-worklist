@@ -98,12 +98,24 @@ class App:
                 c.execute("UPDATE outbox SET delivered_at=? WHERE seq=?", (iso(self.clock.now()), r["seq"]))
         return len(rows)
 
+    def fhir_sync_now(self):
+        from . import fhir
+        if not self.settings.fhir_base_url:
+            raise BadInput("No FHIR source is configured (set TRIAGE_FHIR_BASE_URL).")
+        client = fhir.FhirClient(self.settings.fhir_base_url, self.settings.fhir_token)
+        return fhir.sync(self.svc, client, self.settings.fhir_org)
+
     def worker_loop(self):
+        import time as _t
+        last_fhir = 0.0
         while not self._stop.is_set():
             try:
                 self.svc.run_jobs_once()
                 self.svc.tick()
                 self.dispatch_outbox()
+                if self.settings.fhir_base_url and _t.time() - last_fhir > 60:
+                    last_fhir = _t.time()
+                    self.fhir_sync_now()
             except Exception as e:  # keep running; record class only
                 safelog.report_error(iso(self.clock.now()), "worker_loop", e)
             self._stop.wait(0.5)
@@ -247,6 +259,15 @@ def make_handler(app: App):
                 return self._json(200, svc.create_user(user, str(b.get("username", "")), str(b.get("name", "")),
                                                        str(b.get("role", "")), str(b.get("title", "")),
                                                        str(b.get("password", ""))[:200]))
+            if p[:2] == ["admin", "fhir"]:
+                if user["role"] != "admin":
+                    raise Forbidden()
+                if m == "GET" and len(p) == 2:
+                    return self._json(200, {"configured": bool(app.settings.fhir_base_url),
+                                            "status": app.store.q("SELECT org, last_sync_at, last_error, encounters, notes FROM fhir_sync")})
+                if m == "POST" and p == ["admin", "fhir", "sync"]:
+                    return self._json(200, app.fhir_sync_now())
+                raise NotFound()
             if m == "POST" and len(p) == 4 and p[:2] == ["admin", "users"] and p[3] in ("activate", "deactivate"):
                 return self._json(200, svc.set_active(user, p[2], p[3] == "activate"))
             if m == "POST" and p == ["logout"]:

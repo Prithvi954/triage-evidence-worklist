@@ -44,6 +44,13 @@ def scrub(text: str) -> str:
     return text
 
 
+def scrub_ids(text: str, identifiers) -> str:
+    """Remove this patient's own identifiers (name parts, MRN, DOB, phone, address) wherever they appear."""
+    for ident in identifiers or ():
+        text = re.sub(r"(?<![A-Za-z0-9])" + re.escape(ident) + r"(?![A-Za-z0-9])", "[identifier removed]", text, flags=re.I)
+    return text
+
+
 def split_sentences(text: str):
     return [s.strip() for s in _SENT.split(text.strip()) if s.strip()]
 

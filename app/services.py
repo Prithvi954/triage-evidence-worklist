@@ -332,16 +332,22 @@ class Service:
                            (job["note_id"], job["note_version"]))
         earlier =self.db.q("SELECT note_id, version, dec(body) AS body, signed_at FROM notes WHERE encounter_id=? AND "
                             "NOT (note_id=? AND version>=?)", (note["encounter_id"], note["note_id"], note["version"]))
+        hdr = self.db.one("SELECT header_json FROM encounter_headers WHERE encounter_id=?", (note["encounter_id"],))
+        from .fhir import identifiers_for
+        ids = identifiers_for(json.loads(hdr["header_json"])) if hdr else []
+        raw_bodies = {(n["note_id"], n["version"]): n["body"] for n in earlier + [note]}
+        note = dict(note, body=excerpt.scrub_ids(note["body"], ids))
+        earlier = [dict(e, body=excerpt.scrub_ids(e["body"], ids)) for e in earlier]
         ex = excerpt.select(note, earlier)
         if ex.abstain_reason:
             self._finish(job, item, "not_called_" + ex.abstain_reason, None)
             return
-        bodies = {(n["note_id"], n["version"]): n["body"] for n in earlier + [note]}
+        bodies = {(n["note_id"], n["version"]): n["body"] for n in earlier + [note]}   # identifier-scrubbed
         settings = self.s
         req = None
         call_id = _id("mc")
         try:
-            self.adapter.check_fixture_boundary(ex.alias_map, ex.sources, bodies)
+            self.adapter.check_fixture_boundary(ex.alias_map, ex.sources, raw_bodies, ids)
             from .adapter import build_request
             req = build_request(ex.sources, ex.matched_terms, settings)
             subst = {}
@@ -1023,7 +1029,7 @@ AI_STATE_TEXT = {
     "conflicting_evidence": "AI-assisted, unverified: conflicting evidence; review the note",
     "malformed": "AI output failed validation; manual review required",
     "stale_discarded": "AI result discarded because the note changed; manual review required",
-    "blocked_not_approved_fixture": "Not sent to AI (not an approved synthetic fixture); manual review required",
+    "blocked_not_approved_fixture": "Not sent to AI (not approved for AI in this deployment); manual review required",
     "not_called_no_watch_terms": "Not sent to AI (no watched terms found by local selector); manual review required",
     "not_called_context_exceeds_bound": "Not sent to AI (context too long to send safely); manual review required",
     "failed_timeout": "AI extraction timed out; manual review required",
