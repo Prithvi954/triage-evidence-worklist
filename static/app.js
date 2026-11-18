@@ -1,6 +1,10 @@
 // Triage Evidence Worklist client. Synthetic demo. All content is set with textContent (no HTML injection).
 "use strict";
 
+// ESI (Emergency Severity Index) levels, as taught in emergency nursing.
+const ESI_TEXT = { 1: "ESI 1, immediate (life-saving help now)", 2: "ESI 2, emergent (high risk, can't wait)",
+  3: "ESI 3, urgent (stable, needs several resources)", 4: "ESI 4, less urgent (one resource)", 5: "ESI 5, non-urgent (no resources)" };
+
 const $ = (id) => document.getElementById(id);
 let S = null;                 // last /api/state
 let es = null;                // EventSource
@@ -623,7 +627,7 @@ function emergencyCard(f, compact) {
     el("h3", { id: hid }, `${f.label}: ${f.factor}`),
     el("p", { class: "em-status" }, f.status_text + "."),
     f.evidence ? el("blockquote", {}, f.evidence) : null,
-    el("p", { class: "hint" }, `Raised ${hhmm(f.raised_at)} by ${f.raised_by}` + (f.note_ref ? ` from ${f.note_ref}` : "") + "."),
+    el("p", { class: "hint" }, `Raised ${hhmm(f.raised_at)} by ${f.raised_by}` + (f.note_ref ? (f.note_ref.startsWith("trn_") ? " from a new note" : ` from ${f.note_ref}`) : "") + "."),
     el("button", { type: "button", class: open ? "primary" : null, onclick: () => openEmergency(f.id) },
       open ? `Check ${f.label}'s possible emergency` : `View ${f.label}'s emergency decision`));
 }
@@ -939,7 +943,7 @@ function decisionForm(d, draft, usable) {
 }
 
 function priorityForm(d) {
-  const lvl = el("select", { id: "pr-level" }, [1, 2, 3, 4].map((n) => el("option", { value: n, selected: n === d.priority }, `Level ${n}`)));
+  const lvl = el("select", { id: "pr-level" }, [1, 2, 3, 4, 5].map((n) => el("option", { value: n, selected: n === d.priority }, `Level ${n}: ${ESI_TEXT[n]}`)));
   const reason = el("select", { id: "pr-reason" }, [["new_evidence_confirmed", "New evidence verified in note"], ["clinical_judgement", "Clinical judgement"],
     ["protocol_criteria_met", "Protocol criteria met"], ["correction_of_error", "Correcting an earlier error"]].map(([v, t]) => el("option", { value: v }, t)));
   const result = el("p", { id: "pr-result", tabindex: "-1" });
@@ -1340,11 +1344,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // ---------------------------------------------------------------- add your own practice patients / notes
 const NOTE_TEMPLATES = [
-  ["Routine update", "Nursing note. Patient reports demo signal B, unchanged. Resting comfortably."],
-  ["New symptom", "Nursing note. Patient now reports demo signal A that started 20 minutes ago."],
-  ["Possible emergency", "Nursing note. Patient reports demo red flag R right now. Skin pale and clammy."],
-  ["Tricky: family history", "Nursing note. Patient denies demo red flag R. Patient's father had demo red flag R years ago."],
-  ["Tricky: in the past", "Late entry. Demo red flag S resolved last month and has not come back."],
+  ["Routine update", "Reassessment. Patient resting comfortably. Pain 3 out of 10, unchanged. Vital signs stable."],
+  ["Chest pain warning signs", "Reassessment. Patient now reports chest pain spreading to the left arm. Skin pale and sweating."],
+  ["Stroke signs", "Reassessment. New facial droop on the right side and slurred speech first noticed five minutes ago."],
+  ["Breathing trouble", "Reassessment. Patient now has trouble breathing and is unable to speak in full sentences."],
+  ["Possible sepsis", "Reassessment. Patient has a fever and is now confused. Blood pressure low at 84 over 48."],
+  ["Tricky: denied", "Reassessment. Patient denies chest pain and shortness of breath."],
+  ["Tricky: family history", "Triage note. Patient's mother had a stroke at age 70. Patient reports no symptoms."],
+  ["Tricky: in the past", "Triage note. Fever last week that resolved without medicine. No confusion today."],
 ];
 function practiceModal(title, fields, onSubmit) {
   const prev = document.activeElement;

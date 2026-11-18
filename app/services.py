@@ -27,7 +27,7 @@ UNASSESSED_RANK = 1.5           # unassessed patients sort after Level 1, ahead 
 CONFIRM_ROLES = {"charge_rn", "provider"}   # roles allowed to confirm a priority change (demo protocol)
 CLINICAL_ROLES = {"rn", "charge_rn", "provider"}
 EDUCATION_ROLES = {"student", "instructor"}
-PRIORITY_LEVELS = (1, 2, 3, 4)
+PRIORITY_LEVELS = (1, 2, 3, 4, 5)   # ESI (Emergency Severity Index) 1 = most urgent
 EMERGENCY_CHECK_MINUTES = 5      # a nurse checks a possible emergency (illustrative)
 EMERGENCY_DECISION_MINUTES = 10  # the charge nurse makes the final call (illustrative)
 OPEN_FLAG = ("awaiting_nurse", "awaiting_charge")

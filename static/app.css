@@ -9,7 +9,7 @@
   --warn-bg: #fff6d6; --warn-fg: #6b4a00; --warn-line: #e8c96a;
   --bad-bg: #fdeceb; --bad-fg: #9b1c14; --bad-line: #e8a7a2;
   --ok-fg: #1e6b33;
-  --a1: #b42318; --a2: #d9530f; --a3: #e3b008; --a4: #2f8a43; --au: #6b7685;
+  --a1: #b42318; --a2: #d9530f; --a3: #e3b008; --a4: #2f8a43; --a5: #1d6fa5; --au: #6b7685;
   --focus: #f08c00; --radius: 4px;
   color-scheme: light;
 }
@@ -166,7 +166,7 @@ button.big { width: 100%; text-align: left; padding: .5rem .8rem; min-height: 40
 .cell .sub { display: block; font-size: .78rem; color: var(--muted); }
 .acu { display: inline-grid; place-items: center; min-width: 2rem; height: 1.6rem; padding: 0 .35rem; border-radius: 3px; font-weight: 800; color: #fff; font-size: .9rem; }
 .acu-1 { background: var(--a1); } .acu-2 { background: var(--a2); } .acu-3 { background: var(--a3); color: #2a1f00; }
-.acu-4 { background: var(--a4); } .acu-u { background: var(--au); }
+.acu-4 { background: var(--a4); } .acu-5 { background: var(--a5); } .acu-u { background: var(--au); }
 .tag { display: inline-block; font-size: .68rem; font-weight: 800; letter-spacing: .03em; padding: .05rem .3rem; border-radius: 2px; margin-right: .2rem;
   border: 1px solid currentColor; text-transform: uppercase; }
 .tag-em { background: #d93025; color: #fff; border-color: #d93025; }
@@ -176,7 +176,7 @@ button.big { width: 100%; text-align: left; padding: .5rem .8rem; min-height: 40
 .tag-ok { color: var(--ok-fg); }
 /* legacy chip classes still used in a few places */
 .lvl { display: inline-block; font-size: .78rem; font-weight: 800; padding: .05rem .4rem; border-radius: 3px; color: #fff; }
-.lvl-b-1 { background: var(--a1); } .lvl-b-2 { background: var(--a2); } .lvl-b-3 { background: var(--a3); color: #2a1f00; } .lvl-b-4 { background: var(--a4); } .lvl-b-u { background: var(--au); }
+.lvl-b-1 { background: var(--a1); } .lvl-b-2 { background: var(--a2); } .lvl-b-3 { background: var(--a3); color: #2a1f00; } .lvl-b-4 { background: var(--a4); } .lvl-b-5 { background: var(--a5); } .lvl-b-u { background: var(--au); }
 
 .inbox { border: 1px solid var(--line); background: var(--surface); }
 .inbox > li { display: grid; grid-template-columns: minmax(10rem, 1.2fr) 6rem minmax(7rem, 1fr) minmax(12rem, 2fr); align-items: center; column-gap: .7rem;

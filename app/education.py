@@ -79,13 +79,13 @@ def validate_spec(spec):
             raise BadInput(f"{label}: age must be between 0 and 120.")
         prio = p.get("priority")
         prio = int(prio) if prio not in (None, "", "U", "u") else None
-        if prio is not None and prio not in (1, 2, 3, 4):
-            raise BadInput(f"{label}: starting acuity must be 1-4 or unassessed.")
+        if prio is not None and prio not in (1, 2, 3, 4, 5):
+            raise BadInput(f"{label}: starting acuity must be ESI 1-5 or unassessed.")
         ans = p.get("answer") or {}
         maxa = ans.get("max_acuity")
         maxa = int(maxa) if maxa not in (None, "") else None
-        if maxa is not None and maxa not in (1, 2, 3, 4):
-            raise BadInput(f"{label}: expected acuity must be 1-4.")
+        if maxa is not None and maxa not in (1, 2, 3, 4, 5):
+            raise BadInput(f"{label}: expected acuity must be ESI 1-5.")
         clean_p.append({
             "key": key, "label": label, "age": age, "sex": str(p.get("sex") or "")[:1].upper() or None,
             "complaint": str(p.get("complaint") or "")[:60], "location": str(p.get("location") or "")[:30],
@@ -141,7 +141,18 @@ class Education:
 
     # ------------------------------------------------------------------ built-in library
     def seed_builtin(self):
-        if self.db.one("SELECT 1 FROM scenarios WHERE status='builtin'"):
+        """Insert or refresh the built-in scenarios (idempotent; new built-ins appear on existing databases)."""
+        from .scenarios_clinical import CLINICAL_SCENARIOS
+        base = self.svc.clock.now()
+        with self.db.tx() as c:
+            for i, sc in enumerate(CLINICAL_SCENARIOS):
+                ts = iso(base - timedelta(seconds=i))
+                c.execute("INSERT OR REPLACE INTO scenarios VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                          (sc["id"], "builtin", sc["title"], sc["summary"], sc["goals"], sc["role"], "builtin", "system",
+                           ts, ts, json.dumps(sc["spec"]), None))
+                for n in sc["spec"]["notes"]:
+                    c.execute("INSERT OR IGNORE INTO approved_texts VALUES (?,?,?)", (sha(n["text"]), "builtin", ts))
+        if self.db.one("SELECT 1 FROM scenarios WHERE id='sc_builtin_story'"):
             return
         seed = self.svc.seed
         texts = {(n["note_id"], n["version"]): n["body"] for n in seed["seeded_notes"] + seed["deliverable_notes"]}
@@ -179,7 +190,8 @@ class Education:
                 {"key": "E1", "patient": "E", "event": 1, "text": "Nursing note. Patient reports demo red flag R that began five minutes ago. Skin pale and clammy.", "ai_trap": None, "replay": None},
                 {"key": "F1", "patient": "F", "event": 1, "text": "Nursing note. Patient denies demo red flag R. Patient's daughter had demo red flag R last year.", "ai_trap": None, "replay": None},
                 {"key": "G2", "patient": "G", "event": 2, "text": "Late entry. Demo red flag S resolved last week and has not recurred. Patient reports demo signal B is unchanged.", "ai_trap": None, "replay": None}]}
-        now = iso(self.svc.clock.now())
+        now = iso(self.svc.clock.now() - timedelta(days=1))   # tutorials list after the clinical scenarios
+        s1["clinical_review"] = s2["clinical_review"] = "Tutorial with placeholder words (no clinical content)"
         with self.db.tx() as c:
             for sid, title, summary, goals, role, spec in (
                 ("sc_builtin_story", "The changing story",
@@ -206,7 +218,7 @@ class Education:
         self._learner(user)
         rows = self.db.q("SELECT s.*, u.name AS author FROM scenarios s LEFT JOIN users u ON u.id=s.created_by "
                          "WHERE s.status='builtin' OR (s.org=? AND (s.status='approved' OR s.created_by=? OR ?)) "
-                         "ORDER BY CASE s.status WHEN 'builtin' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, s.updated_at DESC",
+                         "ORDER BY CASE s.status WHEN 'builtin' THEN 0 WHEN 'approved' THEN 1 ELSE 2 END, s.id LIKE 'sc_builtin_%', s.updated_at DESC",
                          (user["org"], user["id"], 1 if user["role"] == "instructor" else 0))
         return [self._summary(r, user) for r in rows]
 
@@ -217,7 +229,7 @@ class Education:
                 "author": "Built-in" if r["status"] == "builtin" else (r["author"] or "Unknown"),
                 "mine": r["created_by"] == user["id"], "patients": len(spec["patients"]),
                 "events": max(n["event"] for n in spec["notes"]), "review_comment": r["review_comment"],
-                "ai_enabled": r["status"] in ("builtin", "approved")}
+                "ai_enabled": r["status"] in ("builtin", "approved"), "clinical_review": spec.get("clinical_review")}
 
     def _scenario(self, user, sid, for_edit=False):
         r = self.db.one("SELECT s.*, u.name AS author FROM scenarios s LEFT JOIN users u ON u.id=s.created_by WHERE s.id=?", (sid,))
@@ -338,7 +350,7 @@ class Education:
         """Explore the whole demo unit as one of the training users, in a private copy."""
         if persona not in self.PERSONAS:
             raise NotFound()
-        return self.start_session(user, "sc_builtin_story", parent_token, persona=persona)
+        return self.start_session(user, "sc_clin_shift", parent_token, persona=persona)
 
     def start_session(self, user, sid, parent_token, persona=None):
         self._learner(user)

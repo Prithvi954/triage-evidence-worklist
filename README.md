@@ -42,7 +42,7 @@ Configuration (environment only; nothing secret in the repo): `TRIAGE_MODE` (`re
 
 More settings: `TRIAGE_DEPLOYMENT` (`demo`|`education`|`clinical`), `TRIAGE_DEMO_LOGIN` (1 = one-click demo sign-in), `TRIAGE_DATA_KEY` (Fernet key; encrypts notes and AI payloads at rest. Make one with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`), `TRIAGE_BAA_CONFIRMED` (only with an executed BAA), `TRIAGE_SESSION_IDLE_MIN` (30), `TRIAGE_LOCK_MIN` (3), `TRIAGE_AI_RETENTION_DAYS` (7), `TRIAGE_FHIR_BASE_URL`, `TRIAGE_FHIR_TOKEN`, `TRIAGE_FHIR_ORG`. In `clinical` mode the server refuses to start unless encryption, real accounts, HTTPS cookies and no demo controls are set. The browser never receives the key and never calls Anthropic.
 
-**Latest results (2026-11-17):** 88/88 tests pass (unit, integration, HTTP, privacy canaries, accounts, education scoring, FHIR connector against a fake EHR, headless Chromium). **Live Claude was not called**: no credentials were available while building. Every model result so far is a labeled replay of an authored fixture. See `docs/07-test-report.md`.
+**Latest results (2026-11-18):** 100/100 tests pass (unit, integration, HTTP, privacy canaries, accounts, education scoring, FHIR connector against a fake EHR, headless Chromium). **Live Claude was not called**: no credentials were available while building. Every model result so far is a labeled replay of an authored fixture. See `docs/07-test-report.md`.
 
 ## Three ways to use it
 
@@ -57,6 +57,8 @@ More settings: `TRIAGE_DEPLOYMENT` (`demo`|`education`|`clinical`), `TRIAGE_DEMO
 **Email setup:** set `TRIAGE_SMTP_HOST`, `TRIAGE_SMTP_PORT` (587), `TRIAGE_SMTP_USER`, `TRIAGE_SMTP_PASSWORD`, `TRIAGE_SMTP_FROM`. Any provider works (Gmail with an app password, Brevo, Resend, SendGrid, Mailgun). Without them, codes are printed in the server console, which is only useful for local testing. `TRIAGE_SIGNUP=0` turns public sign-up off.
 
 Seeded accounts (password `demo`, sign in by username): **riley** (RN), **sam** (charge RN), **jordan** (RN, other unit), **drlee** (provider), **alex** (admin), **taylor** (nursing student), **avery** (medical student), **morgan** (instructor).
+
+**Clinical practice scenarios:** *Chest pain in the waiting room*, *Stroke signs: every minute counts*, *Is it sepsis?*, *Can't catch a breath*, and *Saturday evening shift* (used by the training users). Notes use realistic (made-up) clinical wording, acuity uses **ESI 1–5**, and the practice red-flag rules cover chest pain with warning signs, stroke signs, severe breathing trouble, fever with confusion or low blood pressure, severe bleeding, throat or tongue swelling, and unresponsiveness. Each scenario mixes real emergencies with look-alikes (denied symptoms, family history, resolved problems). **Status: pending review by a licensed nurse educator.** Reviewers can use [docs/CLINICAL_REVIEW.md](docs/CLINICAL_REVIEW.md). This is educational content, not clinical guidance.
 
 **Practice in 4 steps (students):** sign in as Taylor → **Start practice** on a scenario → work the board, pressing **Next event** to receive new notes → **Finish and see my score**. Build your own case under **My cases**, practice it, then **Submit to class**; an instructor (Morgan) approves it into the class library. The case builder blocks things that look like real patient information, and student cases are sent to the AI only after approval.
 
@@ -121,6 +123,7 @@ Legend: ✅ implemented and tested · 🟡 implemented, untested · 📝 propose
 10. [If Claude disappears mid-shift: exact path](docs/10-ai-off-path.md)
 11. [Roadmap: hackathon → classroom → hospital](docs/ROADMAP.md)
 12. [Outreach kit: one-pager and emails](docs/OUTREACH.md)
+13. [Clinical review sheet for nurse educators](docs/CLINICAL_REVIEW.md)
 
 ## Code map
 

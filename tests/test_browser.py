@@ -318,9 +318,9 @@ class TestBrowserFocus(unittest.TestCase):
         page.get_by_role("button", name="Practice as Sam").click()
         page.wait_for_function("location.pathname === '/' && !document.getElementById('training-bar').hidden", timeout=10000)
         page.get_by_role("button", name="Add a patient").click()
-        page.get_by_role("button", name="Possible emergency").click()
+        page.get_by_role("button", name="Chest pain warning signs").click()
         page.get_by_role("button", name="Add", exact=True).click()
-        page.wait_for_function("document.getElementById('queue').innerText.includes('Patient H')", timeout=10000)
+        page.wait_for_function("document.getElementById('queue').innerText.includes('Patient I')", timeout=10000)
         ctx.close()
         # signing in again uses email + password; the sign-in page has no training-user list
         ctx = self.browser.new_context(bypass_csp=True)

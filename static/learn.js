@@ -33,6 +33,7 @@ function scenarioCard(s) {
     el("p", {}, s.summary),
     el("p", { class: "sc-meta" }, `Goals: ${s.goals}`),
     s.ai_enabled ? null : el("p", { class: "sc-meta" }, "AI evidence is off until an instructor approves this case."),
+    s.clinical_review ? el("p", { class: "sc-meta" }, `Clinical review: ${s.clinical_review}`) : null,
     s.review_comment ? el("p", { class: "warn" }, `Instructor note: ${s.review_comment}`) : null,
     el("div", { class: "btns" }, btns));
 }
@@ -146,10 +147,10 @@ function patientRow(p, idx) {
     sex: el("select", {}, el("option", { value: "F" }, "F"), el("option", { value: "M" }, "M"), el("option", { value: "X" }, "X")),
     complaint: el("input", { type: "text", value: p.complaint || "Demo concern X", maxlength: 60 }),
     location: el("input", { type: "text", value: p.location || "Lobby", maxlength: 30 }),
-    priority: el("select", {}, el("option", { value: "" }, "Unassessed"), ...[1, 2, 3, 4].map((n) => el("option", { value: n }, `Level ${n}`))),
+    priority: el("select", {}, el("option", { value: "" }, "Unassessed"), ...[1, 2, 3, 4, 5].map((n) => el("option", { value: n }, `ESI ${n}`))),
     restricted: el("input", { type: "checkbox" }),
     emergency: triSelect(p.answer && p.answer.emergency),
-    max_acuity: el("select", {}, el("option", { value: "" }, "Not scored"), ...[1, 2, 3, 4].map((n) => el("option", { value: n }, `Level ${n} or more urgent`))),
+    max_acuity: el("select", {}, el("option", { value: "" }, "Not scored"), ...[1, 2, 3, 4, 5].map((n) => el("option", { value: n }, `ESI ${n} or more urgent`))),
     escalate: triSelect(p.answer && p.answer.escalate),
   };
   inputs.sex.value = p.sex || "F";

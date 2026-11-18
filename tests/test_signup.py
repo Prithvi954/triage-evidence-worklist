@@ -93,16 +93,16 @@ class TestPersonasAndAdding(unittest.TestCase):
             me = self.start(p)
             roles[p] = me["role"]
             self.assertIn("Practicing as", me["title"])
-            self.assertEqual(len(self.svc.state(me)["queue"]), 4)
+            self.assertEqual(len(self.svc.state(me)["queue"]), 5)
         self.assertEqual(roles, {"riley": "rn", "sam": "charge_rn", "drlee": "provider"})
 
     def test_add_patient_and_emergency_note(self):
         me = self.start("riley")
-        r = self.edu.add_patient(me, {"label": "Patient H", "age": "61", "sex": "M", "complaint": "Demo concern Z",
+        r = self.edu.add_patient(me, {"label": "Patient Z", "age": "61", "sex": "M", "complaint": "Demo concern Z",
                                       "note": "Nursing note. Patient reports demo red flag R right now."})
         st = self.svc.state(me)
-        self.assertIn("Patient H", [q["label"] for q in st["queue"]])
-        self.assertIn("Patient H", [f["label"] for f in self.svc.emergencies(me)["flags"]])
+        self.assertIn("Patient Z", [q["label"] for q in st["queue"]])
+        self.assertIn("Patient Z", [f["label"] for f in self.svc.emergencies(me)["flags"]])
         self.edu.add_note(me, r["encounter_id"], "Nursing note. Patient reports demo signal A.")
         with self.assertRaises(BadInput):
             self.edu.add_patient(me, {"label": "John Smith"})

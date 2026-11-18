@@ -21,7 +21,11 @@ import re
 import secrets
 from dataclasses import dataclass, field
 
-WATCH_TERMS = ("demo signal A", "demo signal B")
+WATCH_TERMS = ("demo signal A", "demo signal B",
+               # practice clinical terms (educational; a facility configures its own)
+               "chest pain", "shortness of breath", "trouble breathing", "wheezing", "sweating", "facial droop",
+               "arm weakness", "slurred speech", "dizzy", "headache", "fever", "confused", "confusion",
+               "blood pressure", "bleeding", "rash", "throat tightness", "abdominal pain", "vomiting")
 MAX_CURRENT_CHARS = 900
 MAX_PRIOR_CHARS = 400
 _SENT = re.compile(r"(?<=[.!?])\s+(?=[A-Z])")
